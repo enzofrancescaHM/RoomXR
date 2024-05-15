@@ -907,6 +907,20 @@ function startServer() {
             }
         });
 
+        socket.on('sendFileDirectly', (dataObject) => {
+            if (!roomList.has(socket.room_id)) return;
+
+            // const data = checkXSS(dataObject);
+            const data = dataObject;
+
+            //log.debug('SENDING FILE!!!', data);
+            if (data.to_peer_id == 'all') {
+                roomList.get(socket.room_id).broadCast(socket.id, 'sendFileDirectly', data);
+            } else {
+                roomList.get(socket.room_id).sendTo(data.to_peer_id, 'sendFileDirectly', data);
+            }
+        });
+
         socket.on('disconnect', () => {
             if (!roomList.has(socket.room_id)) return;
 

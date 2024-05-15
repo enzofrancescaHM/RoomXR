@@ -1004,6 +1004,20 @@ class WhiteBoard {
     }
 
 
+    saveBigPicture(data){
+        
+        // save HD file to disk
+        const dataNow = getDataTimeString();
+        const fileName = `whiteboard-${dataNow}.png`;
+        saveDataToFile(data, fileName);
+
+        // save image to whiteboard
+        this.createImageFromURL(data, false);
+        
+     
+    }
+
+
     createImageFromURL(wbCanvasImgURL, savelog = false) {
         var that = this;
         fabric.Image.fromURL(wbCanvasImgURL, function (myImg) {

@@ -689,6 +689,24 @@ class RoomClient {
                 this.exit(true);
             }.bind(this),
         );
+
+        this.socket.on(
+            'sendFileDirectly',
+            function (data) {
+                console.log("sendFileDirectly: " /*+ data.file_data*/);
+                // transform a data64 image to a proper image...
+                     
+                let senddata = {
+                    action: 'bigpicture',
+                    image: data.file_data,
+                };
+                whiteboardAction(senddata, false);
+                
+                //ImportPictureFromVuzix(data.file_data);
+
+
+            }.bind(this),
+        );
     }
 
     // ####################################################
@@ -2011,12 +2029,21 @@ class RoomClient {
     // ####################################################
 
     setTippy(elem, content, placement, allowHTML = false) {
+        //return;
         if (DetectRTC.isMobileDevice) return;
-        tippy(this.getId(elem), {
-            content: content,
-            placement: placement,
-            allowHTML: allowHTML,
-        });
+    
+
+        try {
+            tippy(this.getId(elem), {
+                content: content,
+                placement: placement,
+                allowHTML: allowHTML,
+            });
+        } catch (err) {
+            console.error('setTippy error', err.message);
+        }
+
+        
     }
 
     setVideoAvatarImgName(elemId, peer_name) {

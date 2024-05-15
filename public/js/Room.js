@@ -221,11 +221,18 @@ function initClient() {
 // ####################################################
 
 function setTippy(elem, content, placement, allowHTML = false) {
-    tippy(document.getElementById(elem), {
-        content: content,
-        placement: placement,
-        allowHTML: allowHTML,
-    });
+    //return;
+   
+
+    try {
+        tippy(document.getElementById(elem), {
+            content: content,
+            placement: placement,
+            allowHTML: allowHTML,
+        });
+    } catch (err) {
+        console.error('setTippy error', err.message);
+    }
 }
 
 // ####################################################
@@ -2603,6 +2610,10 @@ function JsonToWbCanvas(json) {
     realWhiteBoard.revivePointer();
 }
 
+function ImportPictureFromVuzix(data){
+    realWhiteBoard.createImageFromURL(data, false);
+}
+
 function getWhiteboardAction(action) {
     return {
         peer_name: peer_name,
@@ -2640,7 +2651,7 @@ function whiteboardAction(data, emit = true) {
             rc.socket.emit('whiteboardAction', data);
         }
     } else {
-        if(data.action != "pointer" && data.action != "screenshot")
+        if(data.action != "pointer" && data.action != "screenshot" && data.action != "bigpicture")
             userLog(
                 'info',
                 `${data.peer_name} <i class="fas fa-chalkboard-teacher"></i> whiteboard action: ${data.action}`,
@@ -2679,6 +2690,11 @@ function whiteboardAction(data, emit = true) {
             realWhiteBoard.whiteboardSetDrawingMode("draw");
             realWhiteBoard.createImageFromURL(data.image, true);            
             //saveImageLog(); // save log moment on cloud
+            break;
+        case 'bigpicture':
+            
+            realWhiteBoard.saveBigPicture("data:image/jpg;base64,"+data.image);
+
             break;
     
         //...
