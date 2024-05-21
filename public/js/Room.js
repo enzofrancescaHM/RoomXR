@@ -713,12 +713,12 @@ async function shareRoom(useNavigator = false) {
             <br/>
             <p style="background:transparent; color:rgb(8, 189, 89);">Join from your mobile device</p>
             <p style="background:transparent; color:white;">Simply capture the QR code with your mobile camera Or Invite someone else to join by sending them the URL pressing Copy URL</p>`,
-            showDenyButton: true,
+            showDenyButton: false,
             showCancelButton: true,
             cancelButtonColor: 'red',
             denyButtonColor: 'green',
             confirmButtonText: `Copy URL`,
-            denyButtonText: `Email invite`,
+            //denyButtonText: `Email invite`,
             cancelButtonText: `Close`,
             showClass: {
                 popup: 'animate__animated animate__fadeInDown',
@@ -735,7 +735,7 @@ async function shareRoom(useNavigator = false) {
                     subject: 'Please join our RoomXR Video Chat Meeting',
                     body: 'Click to join: ' + finurl,
                 };
-                shareRoomByEmail(message);
+                //shareRoomByEmail(message);
             }
             // share screen on join
             if (isScreenAllowed) {
@@ -2691,10 +2691,10 @@ function whiteboardAction(data, emit = true) {
             realWhiteBoard.createImageFromURL(data.image, true);            
             //saveImageLog(); // save log moment on cloud
             break;
-        case 'bigpicture':
-            
-            realWhiteBoard.saveBigPicture("data:image/jpg;base64,"+data.image);
-
+        case 'bigpicture':            
+            realWhiteBoard.wbCanvas.clear();
+            realWhiteBoard.whiteboardSetDrawingMode("draw");   
+            realWhiteBoard.saveBigPicture("data:image/jpg;base64," + data.image);
             break;
     
         //...
@@ -2797,6 +2797,7 @@ async function getParticipantsTable(peers) {
 
     for (let peer of Array.from(peers.keys())) {
         let peer_info = peers.get(peer).peer_info;
+        let peer_os = peer_info.os_name;
         let peer_name = peer_info.peer_name;
         let peer_audio = peer_info.peer_audio ? _PEER.audioOn : _PEER.audioOff;
         let peer_video = peer_info.peer_video ? _PEER.videoOn : _PEER.videoOff;
@@ -2836,19 +2837,38 @@ async function getParticipantsTable(peers) {
                 </tr>
                 `;
             } else {
-                table += `
-                <tr id='${peer_id}'>
-                    <td><img src='${avatarImg}'></td>
-                    <td>${peer_name}</td>
-                    <td><button id='${peer_id}___pAudio'>${peer_audio}</button></td>
-                    <td><button id='${peer_id}___pVideo'>${peer_video}</button></td>
-                    <td><button>${peer_hand}</button></td>
-                    <td><button id='${peer_id}___shareFile' onclick="rc.selectFileToShare('${peer_id}', false)">${peer_sendFile}</button></td>
-                    <td><button id="${peer_id}___sendMessageTo" onclick="rc.sendMessageTo('${peer_id}','${peer_name}')">${peer_sendMsg}</button></td>
-                    <td><button id="${peer_id}___sendVideoTo" onclick="rc.shareVideo('${peer_id}');">${_PEER.sendVideo}</button></td>
-                    <td></td>
-                </tr>
-                `;
+                console.log(peer_info);
+                if(peer_os == "Blade2")                    
+                {
+                    console.log("ecco il caso giusto");
+                    table += `
+                    <tr id='${peer_id}'>
+                        <td><img src='${avatarImg}'></td>
+                        <td>${peer_name}</td>
+                        <td><button>${peer_hand}</button></td>                        
+                        <td><button id="${peer_id}___sendMessageTo" onclick="rc.sendMessageTo('${peer_id}','${peer_name}')">${peer_sendMsg}</button></td>                        
+                        <td></td>
+                    </tr>
+                    `;
+
+                }
+                else
+                {
+                    table += `
+                    <tr id='${peer_id}'>
+                        <td><img src='${avatarImg}'></td>
+                        <td>${peer_name}</td>
+                        <td><button id='${peer_id}___pAudio'>${peer_audio}</button></td>
+                        <td><button id='${peer_id}___pVideo'>${peer_video}</button></td>
+                        <td><button>${peer_hand}</button></td>
+                        <td><button id='${peer_id}___shareFile' onclick="rc.selectFileToShare('${peer_id}', false)">${peer_sendFile}</button></td>
+                        <td><button id="${peer_id}___sendMessageTo" onclick="rc.sendMessageTo('${peer_id}','${peer_name}')">${peer_sendMsg}</button></td>
+                        <td><button id="${peer_id}___sendVideoTo" onclick="rc.shareVideo('${peer_id}');">${_PEER.sendVideo}</button></td>
+                        <td></td>
+                    </tr>
+                    `;
+    
+                }
             }
         }
     }

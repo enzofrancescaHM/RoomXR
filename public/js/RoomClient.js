@@ -39,6 +39,7 @@ const html = {
     bg: 'fas fa-circle-half-stroke',
     pin: 'fas fa-map-pin',
     videoPrivacy: 'far fa-circle',
+    bigpicture: 'fas fa-square-h'
 };
 
 const image = {
@@ -1599,13 +1600,16 @@ class RoomClient {
     }
 
     handleConsumer(id, type, stream, peer_name, peer_info) {
-        let elem, vb, d, p, i, cm, au, fs, ts, sf, sm, sv, ko, pb, pm, pv, pn;
+        let elem, vb, d, p, i, cm, au, fs, ts, sf, sm, sv, ko, pb, pm, pv, pn, bp;
 
         console.log('PEER-INFO', peer_info);
 
         let remotePeerId = peer_info.peer_id;
         let remoteIsScreen = type == mediaType.screen;
         let remotePrivacyOn = peer_info.peer_video_privacy;
+        let isGlasses = false;
+        if (peer_info.os_name == "Blade2")
+            isGlasses = true;
 
         switch (type) {
             case mediaType.video:
@@ -1639,6 +1643,9 @@ class RoomClient {
                 ts = document.createElement('button');
                 ts.id = id + '__snapshot';
                 ts.className = html.snapshot;
+                bp = document.createElement('button');
+                bp.id = id + '___' + remotePeerId + '___bigpicture';
+                bp.className = html.bigpicture;
                 pn = document.createElement('button');
                 pn.id = id + '__pin';
                 pn.className = html.pin;
@@ -1678,12 +1685,14 @@ class RoomClient {
                 pm.appendChild(pb);
                 BUTTONS.consumerVideo.ejectButton && vb.appendChild(ko);
                 BUTTONS.consumerVideo.audioVolumeInput && vb.appendChild(pv);
-                vb.appendChild(au);
-                vb.appendChild(cm);
-                BUTTONS.consumerVideo.sendVideoButton && vb.appendChild(sv);
-                BUTTONS.consumerVideo.sendFileButton && vb.appendChild(sf);
+                !isGlasses && vb.appendChild(au);
+                !isGlasses && vb.appendChild(cm);
+                BUTTONS.consumerVideo.sendVideoButton && !isGlasses && vb.appendChild(sv);
+                BUTTONS.consumerVideo.sendFileButton && !isGlasses && vb.appendChild(sf);
                 BUTTONS.consumerVideo.sendMessageButton && vb.appendChild(sm);
+                vb.appendChild(bp);
                 BUTTONS.consumerVideo.snapShotButton && vb.appendChild(ts);
+                
                 BUTTONS.consumerVideo.fullScreenButton && this.isVideoFullScreenSupported && vb.appendChild(fs);
                 if (!this.isMobileDevice) vb.appendChild(pn);
                 d.appendChild(elem);
@@ -1696,6 +1705,7 @@ class RoomClient {
                 this.isVideoFullScreenSupported && this.handleFS(elem.id, fs.id);
                 this.handleDD(elem.id, remotePeerId);
                 this.handleTS(elem.id, ts.id);
+                this.handleBP(bp.id, bp.id, peer_name);
                 this.handleSF(sf.id);
                 this.handleSM(sm.id, peer_name);
                 this.handleSV(sv.id);
@@ -1722,6 +1732,7 @@ class RoomClient {
                     this.setTippy(au.id, 'Mute', 'top-end');
                     this.setTippy(pv.id, '🔊 Volume', 'top-end');
                     this.setTippy(ko.id, 'Eject', 'top-end');
+                    this.setTippy(bp.id, 'Request HD Pic','top-end');
                 }
                 break;
             case mediaType.audio:
@@ -2581,6 +2592,52 @@ class RoomClient {
                 };
                 whiteboardAction(senddata, false);
             });
+        }
+    }
+
+    handleBP(elemId, tsId, name) {
+
+        console.log("HANDLE BIG PICTURE: " + elemId);
+
+        const words = elemId.split('___');
+        let peer_id = words[1];
+        let peer_name = name;
+
+        console.log("PEERNAME: " + peer_name);
+        console.log("PEERID: " + peer_id);
+
+
+
+        let videoPlayer = this.getId(elemId);
+        let btnTs = this.getId(tsId);
+        if (btnTs && videoPlayer) {
+            console.log("HANDLEPB ENTER CLICK");
+            btnTs.addEventListener('click', () => {
+               
+              
+                console.log("ABBIAMO CLICCATO!");
+                if(!this.isPro)
+                {
+                    // Do Nothing..
+                }
+                else
+                {
+                    let data = {
+                        peer_name: this.peer_name,
+                        peer_id: this.peer_id,
+                        to_peer_id: peer_id,
+                        to_peer_name: peer_name,
+                        peer_msg: "takepicture",
+                    };
+                    //console.log('Send message:', data);
+                    this.socket.emit('message', data);    
+                }                
+                
+              
+            });
+        }
+        else{
+            console.log("oh oh oh");
         }
     }
 
