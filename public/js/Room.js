@@ -2750,6 +2750,7 @@ async function getRoomParticipants(refresh = false) {
 }
 
 async function getParticipantsTable(peers) {
+    //console.log("ciccio00");
     let table = `
     <div>
         <button
@@ -2780,6 +2781,7 @@ async function getParticipantsTable(peers) {
     </tr>`;
 
     if (!isRulesActive || isPresenter) {
+        //console.log("ciccio01");
         table += `
     <tr>
         <td>&nbsp;<i class="fas fa-users fa-lg"></i></td>
@@ -2808,6 +2810,7 @@ async function getParticipantsTable(peers) {
         let peer_id = peer_info.peer_id;
         let avatarImg = getParticipantAvatar(peer_name);
         if (rc.peer_id === peer_id) {
+            //console.log("ciccio02");
             table += `
             <tr id='${peer_name}'>
                 <td><img src='${avatarImg}'></td>
@@ -2823,24 +2826,44 @@ async function getParticipantsTable(peers) {
             `;
         } else {
             if (isRulesActive && isPresenter) {
-                table += `
-                <tr id='${peer_id}'>
-                    <td><img src='${avatarImg}'></td>
-                    <td>${peer_name}</td>
-                    <td><button id='${peer_id}___pAudio' onclick="rc.peerAction('me',this.id,'mute')">${peer_audio}</button></td>
-                    <td><button id='${peer_id}___pVideo' onclick="rc.peerAction('me',this.id,'hide')">${peer_video}</button></td>
-                    <td><button>${peer_hand}</button></td>
-                    <td><button id='${peer_id}___shareFile' onclick="rc.selectFileToShare('${peer_id}', false)">${peer_sendFile}</button></td>
-                    <td><button id="${peer_id}___sendMessageTo" onclick="rc.sendMessageTo('${peer_id}','${peer_name}')">${peer_sendMsg}</button></td>
-                    <td><button id="${peer_id}___sendVideoTo" onclick="rc.shareVideo('${peer_id}');">${_PEER.sendVideo}</button></td>
-                    <td><button id='${peer_id}___pEject' onclick="rc.peerAction('me',this.id,'eject')">${peer_eject}</button></td>
-                </tr>
-                `;
-            } else {
-                console.log(peer_info);
+                //console.log("ciccio03");
                 if(peer_os == "Blade2")                    
                 {
-                    console.log("ecco il caso giusto");
+                    table += `
+                    <tr id='${peer_id}'>
+                        <td><img src='${avatarImg}'></td>
+                        <td>${peer_name}</td>
+                        <td><button>${peer_hand}</button></td>
+                       
+                        <td><button id="${peer_id}___sendMessageTo" onclick="rc.sendMessageTo('${peer_id}','${peer_name}')">${peer_sendMsg}</button></td>
+                       
+                        <td><button id='${peer_id}___pEject' onclick="rc.peerAction('me',this.id,'eject')">${peer_eject}</button></td>
+                    </tr>
+                    `;
+                }
+                else
+                {
+                    table += `
+                    <tr id='${peer_id}'>
+                        <td><img src='${avatarImg}'></td>
+                        <td>${peer_name}</td>
+                        <td><button id='${peer_id}___pAudio' onclick="rc.peerAction('me',this.id,'mute')">${peer_audio}</button></td>
+                        <td><button id='${peer_id}___pVideo' onclick="rc.peerAction('me',this.id,'hide')">${peer_video}</button></td>
+                        <td><button>${peer_hand}</button></td>
+                        <td><button id='${peer_id}___shareFile' onclick="rc.selectFileToShare('${peer_id}', false)">${peer_sendFile}</button></td>
+                        <td><button id="${peer_id}___sendMessageTo" onclick="rc.sendMessageTo('${peer_id}','${peer_name}')">${peer_sendMsg}</button></td>
+                        <td><button id="${peer_id}___sendVideoTo" onclick="rc.shareVideo('${peer_id}');">${_PEER.sendVideo}</button></td>
+                        <td><button id='${peer_id}___pEject' onclick="rc.peerAction('me',this.id,'eject')">${peer_eject}</button></td>
+                    </tr>
+                    `;
+                }
+            } else {
+                //console.log("ciccio04");
+                //console.log(peer_info);
+                if(peer_os == "Blade2")                    
+                {
+                    //console.log("ciccio05");
+                    //console.log("ecco il caso giusto");
                     table += `
                     <tr id='${peer_id}'>
                         <td><img src='${avatarImg}'></td>
@@ -2854,6 +2877,7 @@ async function getParticipantsTable(peers) {
                 }
                 else
                 {
+                    //console.log("ciccio06");
                     table += `
                     <tr id='${peer_id}'>
                         <td><img src='${avatarImg}'></td>
