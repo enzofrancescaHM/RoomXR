@@ -195,6 +195,9 @@ class RoomClient {
         isSpeechSynthesisSupported,
         transcription,
         successCallback,
+        updateSession,
+        isPro,
+        APIPath,
     ) {
         this.localAudioEl = localAudioEl;
         this.remoteAudioEl = remoteAudioEl;
@@ -347,6 +350,9 @@ class RoomClient {
         this.producerLabel = new Map();
         this.eventListeners = new Map();
 
+        this.isPro = isPro;
+        this.currentSessionID = "-"; // safe mechanism
+        this.APIPath = APIPath;
         this.debug = false;
         this.debug ? window.localStorage.setItem('debug', 'mediasoup*') : window.localStorage.removeItem('debug');
 
@@ -897,7 +903,11 @@ class RoomClient {
         this.socket.on('fileAbort', this.handleFileAbortData);
         this.socket.on('receiveFileAbort', this.handleReceiveFileAbortData);
         this.socket.on('wbCanvasToJson', this.handleWbCanvasToJson);
+        this.socket.on('wbSigleToJson', this.handleWbSingleToJson);
         this.socket.on('whiteboardAction', this.handleWhiteboardAction);
+        this.socket.on('wbModify', this.handleWbModify);
+        this.socket.on('wbDeleteObject', this.handleWbDeleteObject);
+        this.socket.on('sendFileDirectly', this.handleSendFileDirectly);
         this.socket.on('audioVolume', this.handleAudioVolumeData);
         this.socket.on('dominantSpeaker', this.handleDominantSpeakerData);
         this.socket.on('updateRoomModerator', this.handleUpdateRoomModeratorData);
@@ -913,6 +923,7 @@ class RoomClient {
         this.socket.on('editorChange', this.handleEditorChange);
         this.socket.on('editorActions', this.handleEditorActions);
         this.socket.on('editorUpdate', this.handleEditorUpdate);
+
     }
 
     // ####################################################
@@ -1026,6 +1037,32 @@ class RoomClient {
     handleWbCanvasToJson = (data) => {
         console.log('SocketOn Received whiteboard canvas JSON');
         JsonToWbCanvas(data);
+    };
+
+    handleWbSingleToJson = (data) => {
+        console.log('SocketOn Received single canvas JSON');
+        SingleJsonToWbCanvas(data);
+    }
+
+    handleWbModify = (data) => {
+        console.log('Whiteboard action MODIFY', data);
+        ModifyCommand(data);
+    };
+
+    handleWbDeleteObject = (data) => {
+        console.log('Whiteboard action DELETEOBJECT', data);
+        DeleteCommand(data);
+    };
+
+    handleSendFileDirectly = (data) => {
+        console.log('Whiteboard action SENDFILEDIRECTLY', data);        
+        // transform a data64 image to a proper image...
+             
+        let senddata = {
+            action: 'bigpicture',
+            image: data.file_data,
+        };
+        whiteboardAction(senddata, false);
     };
 
     handleWhiteboardAction = (data) => {
@@ -2270,6 +2307,12 @@ class RoomClient {
         const remotePrivacyOn = peer_info.peer_video_privacy;
         const remotePeerPresenter = peer_info.peer_presenter;
 
+        // HOLOMASK
+        // locate glass consumer devices
+        let isGlasses = false;
+        if (peer_info.os_name == "Blade2")
+            isGlasses = true;
+
         switch (type) {
             case mediaType.video:
             case mediaType.screen:
@@ -2284,6 +2327,7 @@ class RoomClient {
                 elem.controls = isVideoControlsOn;
                 elem.autoplay = true;
                 elem.className = '';
+                elem.className = (isGlasses /*&&  DetectRTC.browser.name == "Firefox"*/)  ? 'upsidedown' : '';
                 elem.poster = image.poster;
                 elem.style.objectFit = remoteIsScreen || isBroadcastingEnabled ? 'contain' : 'var(--videoObjFit)';
                 vb = document.createElement('div');
@@ -2313,6 +2357,10 @@ class RoomClient {
                 ts = document.createElement('button');
                 ts.id = id + '__snapshot';
                 ts.className = html.snapshot;
+                let bp = document.createElement('button');
+                bp.id = id + '___' + remotePeerId + '___bigpicture';
+                bp.className = html.bigpicture;
+
                 pn = document.createElement('button');
                 pn.id = id + '__pin';
                 pn.className = html.pin;
@@ -2389,6 +2437,7 @@ class RoomClient {
                 this.isVideoFullScreenSupported && this.handleFS(elem.id, fs.id);
                 this.handleDD(elem.id, remotePeerId);
                 this.handleTS(elem.id, ts.id);
+                this.handleBP(bp.id, bp.id, peer_name);
                 this.handleSF(sf.id);
                 this.handleHA(ha.id, d.id);
                 this.handleSM(sm.id, peer_name);
@@ -2974,6 +3023,18 @@ class RoomClient {
         let room_info = await this.socket.request('getRoomInfo');
         return room_info;
     }
+    async getNewSessionID(data) {
+        console.log("we are in getnewsessionid");
+        let sessionid = await this.socket.request('createnewsession',data);
+        console.log(sessionid);
+        return sessionid;
+    }
+    async getTranslation(data) {
+        console.log("we are in getTranslation");
+        let tran = await this.socket.request('translate',data);
+        console.log(tran);
+        return tran;
+    }
 
     refreshParticipantsCount() {
         this.socket.emit('refreshParticipantsCount');
@@ -3323,6 +3384,13 @@ class RoomClient {
             });
         }
         if (videoPlayer) {
+             // if is pro then disable click to fullscreen
+             if(this.isPro)
+                {
+                    videoPlayer.style.pointerEvents = 'none'
+                }
+                else
+                {
             videoPlayer.addEventListener('click', () => {
                 if (videoPlayer.classList.contains('videoCircle')) {
                     return this.userLog('info', 'Full Screen not allowed if video on privacy mode', 'top-end');
@@ -3334,15 +3402,18 @@ class RoomClient {
                     }
                 }
             });
+        }
             videoPlayer.addEventListener('fullscreenchange', (e) => {
                 if (!document.fullscreenElement) {
-                    videoPlayer.style.pointerEvents = 'auto';
+                    if(!this.isPro)
+                        videoPlayer.style.pointerEvents = 'auto';
                     this.isVideoOnFullScreen = false;
                 }
             });
             videoPlayer.addEventListener('webkitfullscreenchange', (e) => {
                 if (!document.webkitIsFullScreen) {
-                    videoPlayer.style.pointerEvents = 'auto';
+                    if(!this.isPro)
+                        videoPlayer.style.pointerEvents = 'auto';
                     this.isVideoOnFullScreen = false;
                 }
             });
@@ -3568,10 +3639,71 @@ class RoomClient {
                 canvas.height = height;
                 context = canvas.getContext('2d');
                 context.drawImage(videoPlayer, 0, 0, width, height);
-                dataURL = canvas.toDataURL('image/png');
+                dataURL = canvas.toDataURL('image/jpeg', 0.5);
                 // console.log(dataURL);
-                saveDataToFile(dataURL, getDataTimeString() + '-SNAPSHOT.png');
+                if(!this.isPro)
+                    {
+                        // we save the snapshot only in normal mode so to permit the good functioning on iPad
+                        saveDataToFile(dataURL, getDataTimeString() + '-SNAPSHOT.jpeg');
+                    }
+                    else
+                    {
+                        // if we are in PRO then open whiteboard automatically
+                        // after a snapshot
+                        OpenWhiteBoardAfterSnapShot();
+                    }                
+                    
+                    let senddata = {
+                        action: 'screenshot',
+                        image: dataURL,
+                    };
+                    whiteboardAction(senddata, false);
             });
+        }
+    }
+    handleBP(elemId, tsId, name) {
+
+        console.log("HANDLE BIG PICTURE: " + elemId);
+
+        const words = elemId.split('___');
+        let peer_id = words[1];
+        let peer_name = name;
+
+        console.log("PEERNAME: " + peer_name);
+        console.log("PEERID: " + peer_id);
+
+
+
+        let videoPlayer = this.getId(elemId);
+        let btnTs = this.getId(tsId);
+        if (btnTs && videoPlayer) {
+            console.log("HANDLEPB ENTER CLICK");
+            btnTs.addEventListener('click', () => {
+               
+              
+                console.log("ABBIAMO CLICCATO!");
+                if(!this.isPro)
+                {
+                    // Do Nothing..
+                }
+                else
+                {
+                    let data = {
+                        peer_name: this.peer_name,
+                        peer_id: this.peer_id,
+                        to_peer_id: peer_id,
+                        to_peer_name: peer_name,
+                        peer_msg: "takepicture",
+                    };
+                    //console.log('Send message:', data);
+                    this.socket.emit('message', data);    
+                }                
+                
+              
+            });
+        }
+        else{
+            console.log("oh oh oh");
         }
     }
 
@@ -3845,7 +3977,7 @@ class RoomClient {
             });
     }
 
-    sendMessage() {
+   async sendMessage() {
         if (!this.thereAreParticipants() && !isChatGPTOn) {
             this.cleanMessage();
             isChatPasteTxt = false;
@@ -3887,10 +4019,13 @@ class RoomClient {
         this.chatMessageTimeLast = currentTime;
 
         chatMessage.value = filterXSS(chatMessage.value.trim());
-        const peer_msg = this.formatMsg(chatMessage.value);
+        var peer_msg = this.formatMsg(chatMessage.value);
         if (!peer_msg) {
             return this.cleanMessage();
         }
+           // this is a good point to translate the message
+           peer_msg = await this.translateMsg(peer_msg);
+           console.log(peer_msg);
         this.peer_name = filterXSS(this.peer_name);
 
         const data = {
@@ -3961,6 +4096,13 @@ class RoomClient {
                         data.to_peer_id,
                         data.to_peer_name,
                     );
+                    if(this.isPro)
+                        {
+                            // sanify the string chat
+                            var realstuff = this.peer_name + "§" + this.safeString(peer_msg) + "§" + this.safeString(this.dateFormat(Date.now()));
+                            // save it to log...
+                            updateSession("chat",realstuff); // update the current session with chat message
+                        }
                     this.cleanMessage();
                 }
             }
@@ -4184,6 +4326,42 @@ class RoomClient {
                 this.userLog('error', err, 'top-end', 6000);
             });
     }
+    async translateMsg(message) {
+
+      
+        
+        
+                var retval = message;
+                //var str = message;
+                var idiom = "nothing";
+        
+                if(this.getId('langselect'))
+                {
+                    console.log(this.getId('langselect').value);
+        
+                    idiom = this.getId('langselect').value;
+
+                    if(idiom == "--")
+                        return message;
+            
+                    var url = this.APIPath + "/posts/translatev2?originstring=" + message + "&targetlanguage=" + idiom;
+                    var data = JSON.stringify({           
+                        url:url
+                    });
+            
+                    var retval = await this.getTranslation(data);
+                    
+                
+                    
+                    return retval;
+    
+                }
+                else
+                    return message;
+        
+        
+      
+            }
 
     formatMsg(msg) {
         const message = filterXSS(msg);
@@ -4369,6 +4547,12 @@ class RoomClient {
                 this.chatMessages = [];
                 this.chatGPTContext = [];
                 this.sound('delete');
+                if(this.isPro)
+                    {
+                        // send a message to glasses in orded to clean also
+                        // their local messages
+                        this.emitCmd(`chat|clear`);
+                    }
             }
         });
     }

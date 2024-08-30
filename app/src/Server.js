@@ -103,6 +103,8 @@ let rtmpUrlStreamsCount = 0;
 // Email alerts and notifications
 const nodemailer = require('./lib/nodemailer');
 
+const fetch = require('./fetch.js');
+
 // Slack API
 const CryptoJS = require('crypto-js');
 const qS = require('qs');
@@ -2648,6 +2650,101 @@ function startServer() {
 
             callback('Successfully exited room');
         });
+
+        /////////////////////////////////////
+        // ROOMXR PRO - CREATE NEW SESSION //
+        /////////////////////////////////////
+        socket.on('createnewsession', (data, cb) => {
+            var myurl = JSON.parse(data).url;
+            
+            fetch.fetch(myurl, {
+                method: 'POST',
+                body: data,
+                headers: {
+                    'Content-Type': 'application/json',
+                }
+            })
+            .then(res => res.json())
+            .then(json => cb( json._id))
+            .catch (err => cb("error!"))
+        });
+
+        /////////////////////////////////////
+        // ROOMXR PRO - TRANSLATE          //
+        /////////////////////////////////////
+        socket.on('translate', (data, cb) => {
+            var myurl = JSON.parse(data).url;
+            console.log(myurl);
+            fetch.fetch(myurl, {
+                method: 'POST',
+                body: data,
+                headers: {
+                    'Content-Type': 'application/json',
+                }
+            })
+            .then(res => res.json())
+            .then(json => cb( json.text))
+            .catch (err => cb("error!"))
+
+
+            // await fetch(this.APIPath + "/gets/translate?originstring=" + message + "&targetlanguage=" + idiom, {
+            //     method: "GET",
+            //     headers: { "Content-Type": "application/json" }
+            // })
+            // .then((response) => response.json())
+            // .then((data) => {
+            //     retval = data.text;
+            //     retval = JSON.stringify(retval);
+            //     console.log(retval);
+                
+            // })
+        });
+
+        /////////////////////////////////////
+        // ROOMXR PRO - wbSingleToJson     //
+        /////////////////////////////////////
+        socket.on('wbSingleToJson', (data) => {
+            if (!roomList.has(socket.room_id)) return;
+    
+             //let objLength = bytesToSize(Object.keys(data).length);
+             //log.debug('Send Whiteboard canvas JSON', { length: objLength });
+            roomList.get(socket.room_id).broadCast(socket.id, 'wbSingleToJson', data);
+        });
+    
+        /////////////////////////////////////
+        // ROOMXR PRO - WBMODIFY           //
+        /////////////////////////////////////
+        socket.on('wbModify', (data) => {
+            if (!roomList.has(socket.room_id)) return;
+    
+            // let objLength = bytesToSize(Object.keys(data).length);
+            // log.debug('Send Whiteboard canvas JSON', { length: objLength });
+            roomList.get(socket.room_id).broadCast(socket.id, 'wbModify', data);
+        });
+    
+        /////////////////////////////////////
+        // ROOMXR PRO - WBDELETEOBJECT     //
+        /////////////////////////////////////
+        socket.on('wbDeleteObject', (data) => {
+            if (!roomList.has(socket.room_id)) return;
+    
+            // let objLength = bytesToSize(Object.keys(data).length);
+            // log.debug('Send Whiteboard canvas JSON', { length: objLength });
+            roomList.get(socket.room_id).broadCast(socket.id, 'wbDeleteObject', data);
+        });
+    
+        /////////////////////////////////////
+        // ROOMXR PRO - WBPOINTER          //
+        /////////////////////////////////////
+        socket.on('wbPointer', (data) => {
+            if (!roomList.has(socket.room_id)) return;
+    
+            roomList.get(socket.room_id).broadCast(socket.id, 'wbPointer', data);
+        });
+
+
+
+
 
         // common
         function getPeerName(room, json = true) {

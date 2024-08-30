@@ -21,6 +21,7 @@ if (location.href.substr(0, 5) !== 'https') location.href = 'https' + location.h
 
 console.log('Window Location', window.location);
 
+const RoomURLPRO = window.location.href;
 const socket = io({ transports: ['websocket'] });
 
 let survey = {
@@ -70,14 +71,18 @@ const Base64Prefix = 'data:application/pdf;base64,';
 // Whiteboard
 const wbImageInput = 'image/*';
 const wbPdfInput = 'application/pdf';
-const wbWidth = 1366;
-const wbHeight = 768;
+const wbWidth = 1200;
+const wbHeight = 675;
+//const wbWidth = 1366;
+//const wbHeight = 768;
 const wbGridSize = 20;
 const wbStroke = '#cccccc63';
 let wbGridLines = [];
 let wbGridVisible = false;
 
 const swalImageUrl = '../images/pricing-illustration.svg';
+
+const APIPath = "https://roomxr.eu:5002";
 
 // Media
 const sinkId = 'sinkId' in HTMLMediaElement.prototype;
@@ -196,6 +201,9 @@ let peer_token = getPeerToken();
 let isScreenAllowed = getScreen();
 let isHideMeActive = getHideMeActive();
 let notify = getNotify();
+let is_pro =  getIsPro();
+let loginParametersMail = getParMail();
+let loginParametersCompany = getParCompany();
 isPresenter = isPeerPresenter();
 
 let peer_info = null;
@@ -235,13 +243,19 @@ let wbIsRedoing = false;
 let wbIsEraser = false;
 let wbIsBgTransparent = false;
 let wbPop = [];
+let wbCurrentTool = "select";
+let wbCurrentPoint = null;
+let realWhiteBoard;
 let coords = {};
 
 let isButtonsVisible = false;
 let isButtonsBarOver = false;
 
 let isRoomLocked = false;
-
+// sessions
+let currentSessionID = null;
+let imageSessionCounter = 0;
+let sessionTimer = null;
 let initStream = null;
 
 let scriptProcessor = null;
@@ -313,11 +327,24 @@ function initClient() {
         setTippy('whiteboardGridBtn', 'Toggle whiteboard grid', 'bottom');
         setTippy('wbBackgroundColorEl', 'Background color', 'bottom');
         setTippy('wbDrawingColorEl', 'Drawing color', 'bottom');
+        setTippy('wbFillColorEl', 'Fill color', 'bottom');
         setTippy('whiteboardPencilBtn', 'Drawing mode', 'bottom');
         setTippy('whiteboardObjectBtn', 'Object mode', 'bottom');
         setTippy('whiteboardUndoBtn', 'Undo', 'bottom');
         setTippy('whiteboardRedoBtn', 'Redo', 'bottom');
         setTippy('whiteboardLockBtn', 'Toggle Lock whiteboard', 'right');
+        setTippy('whiteboardImgFileBtn', 'Add image file', 'bottom');
+        setTippy('whiteboardImgUrlBtn', 'Add image url', 'bottom');
+        setTippy('whiteboardTextBtn', 'Add text', 'bottom');
+        setTippy('whiteboardLineBtn', 'Add line', 'bottom');
+        setTippy('whiteboardArrowBtn', 'Add arrow', 'bottom')
+        setTippy('whiteboardRectBtn', 'Add rectangle', 'bottom');
+        setTippy('whiteboardCircleBtn', 'Add circle', 'bottom');
+        setTippy('whiteboardSaveBtn', 'Save', 'bottom');
+        setTippy('whiteboardEraserBtn', 'Eraser', 'bottom');
+        setTippy('whiteboardCleanBtn', 'Clean', 'bottom');
+        setTippy('whiteboardDecalBtn', 'Decals', 'bottom');
+        setTippy('whiteboardPointerBtn', 'Laser Pointer', 'bottom');
         setTippy('whiteboardUnlockBtn', 'Toggle Lock whiteboard', 'right');
         setTippy('whiteboardCloseBtn', 'Close', 'right');
         setTippy('chatCleanTextButton', 'Clean', 'top');
@@ -335,6 +362,16 @@ function initClient() {
         setTippy('chatShowParticipantsList', 'Toggle participants list', 'bottom');
         setTippy('chatMaxButton', 'Maximize', 'bottom');
         setTippy('chatMinButton', 'Minimize', 'bottom');
+        setTippy('chatShareFileButton', 'Share file', 'top');
+        setTippy('chatCleanButton', 'Clean', 'bottom');
+        setTippy('chatSaveButton', 'Save', 'bottom');
+        setTippy('chatGhostButton', 'Toggle transparent background', 'bottom');
+        setTippy('chatCloseButton', 'Close', 'right');
+        setTippy('participantsCloseBtn', 'Close', 'left');
+        setTippy('sessionTime', 'Session time', 'top');
+        setTippy('startProRecButton', 'Start saving session', 'right');
+        setTippy('stopProRecButton', 'Stop saving session', 'right');
+        setTippy('participantsButton', 'Open participants view', 'right');
         setTippy('pollTogglePin', 'Toggle pin', 'bottom');
         setTippy('pollMaxButton', 'Maximize', 'bottom');
         setTippy('pollMinButton', 'Minimize', 'bottom');
@@ -365,6 +402,13 @@ function initClient() {
     }
     setupWhiteboard();
     initEnumerateDevices();
+    // if is RoomXR PRO then disable fadeout
+    if (getIsPro())
+    {
+        //var mycontrols = document.getElementById("control");
+        control.style.display = 'flex';
+
+    }
     setupInitButtons();
 }
 
@@ -430,6 +474,35 @@ function setTippy(elem, content, placement, allowHTML = false) {
     } else {
         console.warn('setTippy element not found with content', content);
     }
+}
+
+// ####################################################
+// GET IS PRO
+// ####################################################
+
+function getIsPro() {
+    let qs = new URLSearchParams(window.location.search);
+    let queryRoomId = qs.get('pro');
+    let isPro = queryRoomId ? true : false;
+    console.log(isPro);
+    return isPro;
+}
+
+function getParMail() {
+    let qs = new URLSearchParams(window.location.search);
+    let queryMail = qs.get('mail');
+    let mail = queryMail ? queryMail : "";
+    console.log("mail: " + mail);
+    return mail;
+
+}
+
+function getParCompany() {
+    let qs = new URLSearchParams(window.location.search);
+    let queryCompany = qs.get('company');
+    let company = queryCompany ? queryCompany : "";
+    console.log("company: " + company);
+    return company;
 }
 
 // ####################################################
@@ -1119,17 +1192,39 @@ function checkMedia() {
 // ####################################################
 
 async function shareRoom(useNavigator = false) {
+    var finurl = RoomURL;
+
+    // if we are pro then the share button must share the right parameters
+    if(getIsPro()){
+
+        finurl = RoomURLPRO;
+        // https://roomxr.eu/join/pippo@formaggio.eu?audio=1&video=1&notify=0&pro=true&name=Pippo&mail=pippo.formaggio@formaggio.eu&company=asiago
+        const url_base = finurl.split('?')[0];
+        const params = new URLSearchParams(finurl);
+        const url_name = params.get("name");
+        const url_audio = params.get("audio");
+        const url_video = params.get("video");
+        const url_notify = params.get("notify");
+        const url_pro = params.get("pro");
+        const url_mail = params.get("mail");
+        const url_company = params.get("company");
+
+        // rebuild the string
+        finurl = url_base + "?audio=" + url_audio + "&video=" + url_video + "&notify=" + url_notify + "&name=Guest" /*+ "&date=" + ""*/;
+        
+
+    }
     if (navigator.share && useNavigator) {
         try {
-            await navigator.share({ url: RoomURL });
+            await navigator.share({ url: finurl });
             userLog('info', 'Room Shared successfully', 'top-end');
         } catch (err) {
-            share();
+            share(finurl);
         }
     } else {
-        share();
+        share(finurl);
     }
-    function share() {
+    function share(finurl) {
         sound('open');
 
         Swal.fire({
@@ -1143,7 +1238,7 @@ async function shareRoom(useNavigator = false) {
             <br/>
             <p style="background:transparent; color:rgb(8, 189, 89);">Join from your mobile device</p>
             <p style="background:transparent; color:white; font-family: Arial, Helvetica, sans-serif;">No need for apps, simply capture the QR code with your mobile camera Or Invite someone else to join by sending them the following URL</p>
-            <p style="background:transparent; color:rgb(8, 189, 89);">${RoomURL}</p>`,
+            <p style="background:transparent; color:rgb(8, 189, 89);">${finurl}</p>`,
             showDenyButton: true,
             showCancelButton: true,
             cancelButtonColor: 'red',
@@ -1155,9 +1250,9 @@ async function shareRoom(useNavigator = false) {
             hideClass: { popup: 'animate__animated animate__fadeOutUp' },
         }).then((result) => {
             if (result.isConfirmed) {
-                copyRoomURL();
+                copyRoomURL(finurl);
             } else if (result.isDenied) {
-                shareRoomByEmail();
+                shareRoomByEmail(finurl);
             }
             // share screen on join
             if (isScreenAllowed) {
@@ -1176,20 +1271,20 @@ function isDesktopDevice() {
     return !DetectRTC.isMobileDevice && !isTabletDevice && !isIPadDevice;
 }
 
-function makeRoomQR() {
+function makeRoomQR(urlp) {
     let qr = new QRious({
         element: document.getElementById('qrRoom'),
-        value: RoomURL,
+        value: getIsPro() ? urlp : RoomURL,
     });
     qr.set({
         size: 256,
     });
 }
 
-function copyRoomURL() {
+function copyRoomURL(urlp) {
     let tmpInput = document.createElement('input');
     document.body.appendChild(tmpInput);
-    tmpInput.value = RoomURL;
+    tmpInput.value = getIsPro() ? urlp : RoomURL;
     tmpInput.select();
     tmpInput.setSelectionRange(0, 99999); // For mobile devices
     navigator.clipboard.writeText(tmpInput.value);
@@ -1210,7 +1305,7 @@ function copyToClipboard(txt, showTxt = true) {
         : userLog('info', `Copied to clipboard 👍`, 'top-end');
 }
 
-function shareRoomByEmail() {
+function shareRoomByEmail(finurl) {
     Swal.fire({
         allowOutsideClick: false,
         allowEscapeKey: false,
@@ -1233,7 +1328,7 @@ function shareRoomByEmail() {
                     : '';
             const email = '';
             const emailSubject = `Please join our ${BRAND.app.name} Video Chat Meeting`;
-            const emailBody = `The meeting is scheduled at: ${newLine} DateTime: ${selectedDateTime} ${newLine}${roomPassword}Click to join: ${RoomURL} ${newLine}`;
+            const emailBody = `The meeting is scheduled at: ${newLine} DateTime: ${selectedDateTime} ${newLine}${roomPassword}Click to join: ${finurl} ${newLine}`;
             document.location = 'mailto:' + email + '?subject=' + emailSubject + '&body=' + emailBody;
         },
     });
@@ -1274,7 +1369,11 @@ function joinRoom(peer_name, room_id) {
             isSpeechSynthesisSupported,
             transcription,
             roomIsReady,
+            updateSession,
+            is_pro,
+            APIPath,
         );
+        realWhiteBoard.wbRC = rc;
         handleRoomClientEvents();
         //notify ? shareRoom() : sound('joined');
     }
@@ -1319,7 +1418,7 @@ function roomIsReady() {
     show(chatPasteButton);
     show(chatSendButton);
     if (isDesktopDevice()) {
-        show(whiteboardGridBtn);
+        //show(whiteboardGridBtn);
     }
     if (DetectRTC.isMobileDevice) {
         hide(initVideoAudioRefreshButton);
@@ -1402,6 +1501,16 @@ function roomIsReady() {
     checkButtonsBar();
     if (room_password) {
         lockRoomButton.click();
+    }
+    if(is_pro)
+    {
+        show(startProRecButton);
+        hide(exitButton);
+        hide(aboutButton);
+        hide(chatMarkdownButton);
+        hide(chatEmojiButton);
+        //hide(chatShareFileButton);
+        hide(wbBackgroundColorEl);
     }
 }
 
@@ -1735,6 +1844,7 @@ function handleButtons() {
         rc.pasteMessage();
     };
     chatSendButton.onclick = () => {
+        realWhiteBoard.whiteboardSetDrawingMode("draw"); // this is useful for univet, sometimes the laser pointer remaind active
         rc.sendMessage();
     };
     chatEmojiButton.onclick = () => {
@@ -1744,6 +1854,9 @@ function handleButtons() {
         isChatMarkdownOn = !isChatMarkdownOn;
         setColor(chatMarkdownButton, isChatMarkdownOn ? 'lime' : 'white');
     };
+    /*chatShareFileButton.onclick = () => {
+        fileShareButton.click();
+    };*/
     chatSpeechStartButton.onclick = () => {
         startSpeech();
     };
@@ -1887,10 +2000,12 @@ function handleButtons() {
         rc.snapshotRoom();
     };
     whiteboardPencilBtn.onclick = () => {
-        whiteboardIsDrawingMode(true);
+        realWhiteBoard.whiteboardSetDrawingMode("draw");
+        //whiteboardIsDrawingMode(true);
     };
     whiteboardObjectBtn.onclick = () => {
-        whiteboardIsDrawingMode(false);
+        realWhiteBoard.whiteboardSetDrawingMode("none");
+        //whiteboardIsDrawingMode(false);
     };
     whiteboardUndoBtn.onclick = () => {
         whiteboardAction(getWhiteboardAction('undo'));
@@ -1911,10 +2026,14 @@ function handleButtons() {
         whiteboardAddObj('imgUrl');
     };
     whiteboardTextBtn.onclick = () => {
+        realWhiteBoard.whiteboardSetDrawingMode("none");
         whiteboardAddObj('text');
     };
     whiteboardLineBtn.onclick = () => {
         whiteboardAddObj('line');
+    };
+    whiteboardArrowBtn.onclick = () => {
+        whiteboardAddObj('arrow');
     };
     whiteboardRectBtn.onclick = () => {
         whiteboardAddObj('rect');
@@ -1925,14 +2044,21 @@ function handleButtons() {
     whiteboardCircleBtn.onclick = () => {
         whiteboardAddObj('circle');
     };
+    whiteboardPointerBtn.onclick = () => {
+        realWhiteBoard.whiteboardSetDrawingMode("pointer");
+    }
     whiteboardEraserBtn.onclick = () => {
-        whiteboardIsEraser(true);
+        realWhiteBoard.whiteboardSetDrawingMode("eraser");
+        //whiteboardIsEraser(true);
     };
     whiteboardCleanBtn.onclick = () => {
         confirmClearBoard();
     };
     whiteboardCloseBtn.onclick = () => {
         whiteboardAction(getWhiteboardAction('close'));
+    };
+    whiteboardDecalBtn.onclick = () => {
+        whiteboardAddObj('decal');
     };
     whiteboardLockBtn.onclick = () => {
         toggleLockUnlockWhiteboard();
@@ -1961,11 +2087,277 @@ function handleButtons() {
     aboutButton.onclick = () => {
         showAbout();
     };
+    startProRecButton.onclick = () => {
+        console.log("start pressed!");
+        hide(startProRecButton);
+        show(stopProRecButton);
+        createNewSession();
+    };
+    stopProRecButton.onclick = () => {
+        console.log("stop pressed!");
+        show(startProRecButton);
+        hide(stopProRecButton);
+        stopSessionTimer();
+
+    };
     // restartICE.onclick = async () => {
     //     await rc.restartIce();
     // };
 }
+// ####################################################
+// SESSIONS
+// ####################################################
 
+async function getFirstPartecipantName(){
+    var partName = "---";
+    let room_info = await rc.getRoomInfo();
+    let peers = new Map(JSON.parse(room_info.peers));
+    if (peers.size == 1)
+        return partName;
+
+    for (let peer of Array.from(peers.keys())) {
+        let peer_info = peers.get(peer).peer_info;
+        partName = peer_info.peer_name;
+    }
+    return partName;
+}
+
+function saveImageLog(){
+    // this is a good place to save the image logs on the server for the pro version.
+    if(getIsPro() && currentSessionID != "-") // check if we ar in pro and if there is a session
+    {
+        console.log("saveImageLog:");
+        console.log(currentSessionID);
+
+        // take image from canvas
+        var dataurl = realWhiteBoard.wbCanvas.toDataURL({
+            format: 'jpeg',
+            quality: 0.8
+            });
+
+        // convert to blob in order to send via web api
+        var arr = dataurl.split(','), mime = arr[0].match(/:(.*?);/)[1],
+        bstr = atob(arr[1]), n = bstr.length, u8arr = new Uint8Array(n);
+        while (n--) {
+            u8arr[n] = bstr.charCodeAt(n);
+        }
+        var blob =  new Blob([u8arr], { type: mime });
+
+        // now, this must be sent as a file
+        filesHandlerCloud(blob, false); // this function is
+
+    }
+}
+
+async function createNewSession() {
+	// safe mechanism to avoid update before creating a new session
+	currentSessionID = "-";
+
+	var url = APIPath + "/posts/createsessionv2";
+
+    // collect the partecipant name... we take the first one
+    var remName = await getFirstPartecipantName();
+   
+    
+    var data = JSON.stringify({
+		device: remName,
+		datestart: Date.now(),
+		dateend: Date.now(),
+		email: loginParametersMail,
+		company: loginParametersCompany,
+        url:url
+	});
+
+    var resp = await rc.getNewSessionID(data);
+    currentSessionID = resp;
+    RoomClient.currentSessionID = currentSessionID; // this passes the info to the RC
+    imageSessionCounter = 0;
+}
+
+function updateSession(actiontype, event) {
+	
+    
+    // safe mechanism to avoid update before creating a new session
+	if (currentSessionID === "-")
+		return;
+	
+    var url = APIPath + "/posts/updatesessionv2";
+    var rheaders = new Headers({
+        'Content-Type': 'application/json',
+    });
+
+
+    var realAction = "";
+	var realImage = "";
+	var realEvent = "";
+
+	if (actiontype === "date") {
+		realAction = "date";
+	}
+	if (actiontype === "image") {
+		realAction = "image";
+		realImage = event;
+	}
+	if (actiontype === "clearing") {
+		realAction = "clearing";
+	}
+	if (actiontype === "drawLine") {
+		realAction = "line";
+		realEvent = event;
+	}
+	if (actiontype === "drawArrow") {
+		realAction = "arrow";
+		realEvent = event;
+	}
+	if (actiontype === "drawRect") {
+		realAction = "rect";
+		realEvent = event;
+	}
+	if (actiontype === "drawCircle") {
+		realAction = "circle";
+		realEvent = event;
+	}
+	if (actiontype === "drawPoint") {
+		realAction = "point";
+		realEvent = event;
+	}
+	if (actiontype === "drawStroke") {
+		realAction = "stroke";
+		realEvent = event;
+	}
+	if (actiontype === "drawBufferPoints") {
+		realAction = "buffer";
+		realEvent = event;
+	}
+	if (actiontype === "chat") {
+		realAction = "chat";
+		realEvent = event;
+	}
+	if (actiontype === "note") {
+		realAction = "note";
+		realEvent = event;
+	}
+	if (actiontype === "drawText") {
+		realAction = "text";
+		realEvent = event;
+	}
+	if (actiontype === "drawDecal") {
+		realAction = "decal";
+		realEvent = event;
+	}
+
+	var data = JSON.stringify({
+		action: realAction,
+		image: realImage,
+		event: realEvent,
+		_id: currentSessionID,
+		mail: loginParametersMail,
+		company: loginParametersCompany,
+		dateend: Date.now(),
+	});
+    
+
+    let initObject = {
+        method:'POST', headers:rheaders,body:data
+    };
+
+    
+    
+    fetch(url, initObject)
+    .then((response) => response.json())    
+    .then((data) => {
+        console.log("success", data);       
+    })
+    .catch(function (err) {
+        console.log("[UpdateSessionV2] Something went wrong!", err);
+    });
+    
+    
+    
+    
+
+}
+
+function startSessionTimer() {
+    /*
+    sessionTimer = setInterval(function printTime() {      
+        updateSession("date");
+    }, 5000);*/
+}
+function stopSessionTimer() {
+    clearInterval(sessionTimer);
+}
+
+function filesHandlerCloud(files, user) {
+
+	var data = new FormData();
+	var requestString = APIPath + "/posts/upload?company=" + loginParametersCompany;
+
+	if (user == true) {
+		// file selected by the user
+		// check extension
+		//if (!myutils.isValidFile(files[0].name)) {
+		//	alert('this kind of file is not permitted')
+		//	return;
+		//}
+		// check size
+		//var FileSize = files[0].size / 1024 / 1024; // in MB
+		//if (FileSize > 10) {
+		//	alert('File size exceeds 10 MB');
+		//	return;
+		//}
+		// in case of multiple files append each of them
+		//data.append("file", files[0]);
+		// we have to change also the request in order to pass right arguments to server
+		//requestString = requestString + "&session=no";
+	}
+	else {
+		//let status = easyrtc.getConnectStatus(otherEasyrtcid);
+		//if (status === easyrtc.NOT_CONNECTED)
+		//	return;
+		imageSessionCounter = imageSessionCounter + 1;
+		var imageFileName = currentSessionID + "." + imageSessionCounter + ".jpg";
+		// file automatically pushed to server
+		data.append("file", files, imageFileName);
+		// we have to change also the request in order to pass right arguments to server
+		requestString = requestString + "&session=yes&filename=" + imageFileName;
+
+		// write also in the session in order to save the log
+		updateSession("image", imageFileName);
+		//lastImageSavedAddress = imageFileName;
+		//$$("magnifyimageiconmain").show();
+	}
+
+	var request = new XMLHttpRequest();
+	request.open("post", requestString);
+
+	// upload progress event
+	//request.upload.addEventListener("progress", function (e) {
+	//	var percent_complete = (e.loaded / e.total) * 100;
+
+		// Percentage of upload completed
+		//console.log(percent_complete);
+		//if (user == true)
+			//fileStatus.innerHTML = "progress: " + Math.round(percent_complete);
+	//});
+
+	// AJAX request finished event
+	request.addEventListener("load", function (e) {
+		// HTTP status message
+		console.log(request.status);
+		//if (user == true) {
+			// notify the good response to HTML
+			//fileStatus.innerHTML = request.response;
+			// refresh filelist
+			//filesListHandler();
+		//}
+		// request.response will hold the response from the server
+		console.log(request.response);
+	});
+
+	// send POST request to server side script
+	request.send(data);
+}
 // ####################################################
 // HANDLE INIT USER
 // ####################################################
@@ -2493,15 +2885,59 @@ function handleSelects() {
     };
     // whiteboard options
     wbDrawingColorEl.onchange = () => {
-        wbCanvas.freeDrawingBrush.color = wbDrawingColorEl.value;
-        whiteboardIsDrawingMode(true);
+        //wbCanvas.freeDrawingBrush.color = wbDrawingColorEl.value;
+        //whiteboardIsDrawingMode(true);
+        realWhiteBoard.wbCanvas.freeDrawingBrush.color = wbDrawingColorEl.value;
+        realWhiteBoard.whiteboardSetDrawingMode("none");
+        let data = {
+            peer_name: peer_name,
+            action: 'fgcolor',
+            color: wbDrawingColorEl.value,
+        };
+        whiteboardAction(data);
     };
     wbBackgroundColorEl.onchange = () => {
-        setWhiteboardBgColor(wbBackgroundColorEl.value);
+        realWhiteBoard.whiteboardSetDrawingMode("none");
+        let data = {
+            peer_name: peer_name,
+            action: 'bgcolor',
+            color: wbBackgroundColorEl.value,
+        };
+        whiteboardAction(data);
+        //setWhiteboardBgColor(wbBackgroundColorEl.value);
     };
     whiteboardGhostButton.onclick = (e) => {
         wbIsBgTransparent = !wbIsBgTransparent;
-        wbIsBgTransparent ? wbCanvasBackgroundColor('rgba(0, 0, 0, 0.100)') : setTheme();
+        realWhiteBoard.whiteboardSetDrawingMode("none");
+        let data = {
+            peer_name: peer_name,
+            action: 'bgcolor',
+            color: wbIsBgTransparent ? 'rgba(0, 0, 0, 0.100)' : wbBackgroundColorEl.value,
+        };
+        wbCanvasBackgroundColor(data.color);
+        //wbIsBgTransparent ? wbCanvasBackgroundColor('rgba(0, 0, 0, 0.100)') : setTheme();
+    };
+    wbFillColorEl.onclick = (e) => {
+        realWhiteBoard.whiteboardSetDrawingMode("none");
+    };
+
+    wbDrawingColorEl.onclick = (e) => {
+        realWhiteBoard.whiteboardSetDrawingMode("none");
+    };
+
+    wbFillColorEl.onchange = () => {
+        //console.log(wbFillColorEl.value);
+        realWhiteBoard.wbFillColor = wbFillColorEl.value/* + realWhiteBoard.wbOpacityHex*/;
+        console.log(realWhiteBoard.wbFillColor);
+        realWhiteBoard.whiteboardSetDrawingMode("none");
+        //realWhiteBoard.set
+        let data = {
+            peer_name: peer_name,
+            action: 'flcolor',
+            color: wbFillColorEl.value/* + realWhiteBoard.wbOpacityHex*/,
+        };
+        whiteboardAction(data);
+
     };
     whiteboardGridBtn.onclick = (e) => {
         toggleCanvasGrid();
@@ -3157,8 +3593,11 @@ function showButtons() {
 
 function checkButtonsBar() {
     if (!isButtonsBarOver) {
-        toggleClassElements('videoMenuBar', 'none');
-        control.style.display = 'none';
+        if(!getIsPro())
+            {
+                toggleClassElements('videoMenuBar', 'none');
+                control.style.display = 'none';
+            }
         bottomButtons.style.display = 'none';
         isButtonsVisible = false;
     }
@@ -3271,7 +3710,62 @@ function whiteboardCenter() {
     whiteboard.style.top = '50%';
     whiteboard.style.left = '50%';
 }
+function wbCanvasToJson() {
+    if (/*this.wbRC*/rc.thereAreParticipants()) {
+        let restrictCanvas = true // this parameter tell to send one stroke at a time
+        if(restrictCanvas == false)
+        {
+            let wbCanvasJson = JSON.stringify(realWhiteBoard.wbCanvas.toJSON());
+            /*this.wbRC*/rc.socket.emit('wbCanvasToJson', wbCanvasJson);
+        }
+        else if(realWhiteBoard.lastObj)
+        {
+            //console.log(realWhiteBoard.lastObj);
+            //console.log(realWhiteBoard.lastObj.toJSON());
+            //console.log(JSON.stringify(realWhiteBoard.lastObj.toJSON()));
 
+            // this is the last chance to add the element id for the objects
+            let myid = realWhiteBoard.lastObj.type + Math.round(Math.random() * 10000);
+            realWhiteBoard.lastObj.set({'elementID': myid});    
+
+            let wbCanvasJson = JSON.stringify(realWhiteBoard.lastObj.toJSON(['elementID']));
+            /*this.wbRC*/rc.socket.emit('wbSingleToJson', wbCanvasJson);
+        }
+        realWhiteBoard.revivePointer();
+    }
+}
+
+function wbTransmitPointer(data) {
+    if (this.wbRC.thereAreParticipants()) {
+        let wbPointerData = JSON.stringify(data);
+        this.wbRC.socket.emit('wbPointer', wbPointerData);
+        //console.log('wbPointer: ' + wbPointerData);
+    }
+}
+
+function wbTransmitModify(data){
+    console.log("transmit modify");
+    //console.log( JSON.stringify(realWhiteBoard.wbCanvas.toJSON()))
+    if (rc.thereAreParticipants()) {
+        let wbModData = JSON.stringify(data);
+        rc.socket.emit('wbModify', wbModData);
+        //console.log('wbModify: ' + wbModData);
+    }
+}
+
+function wbTransmitDelete(data){
+    console.log("transmit delete");
+    //console.log( JSON.stringify(realWhiteBoard.wbCanvas.toJSON()))
+    if (rc.thereAreParticipants()) {
+        //let wbModData = JSON.stringify(data);
+        rc.socket.emit('wbDeleteObject', data);
+        //console.log('wbModify: ' + wbModData);
+    }
+}
+function setupWhiteboard() {
+    realWhiteBoard = new WhiteBoard('image/*', wbWidth, wbHeight, wbCanvasToJson, wbTransmitPointer, wbTransmitModify, wbTransmitDelete, saveImageLog, is_pro);
+}
+/*
 function setupWhiteboard() {
     setupWhiteboardCanvas();
     setupWhiteboardCanvasSize();
@@ -3301,7 +3795,7 @@ function setupWhiteboardCanvasSize() {
 
     wbCanvas.calcOffset();
     wbCanvas.renderAll();
-}
+}*/
 
 function setWhiteboardSize(w, h) {
     document.documentElement.style.setProperty('--wb-width', w);
@@ -3381,7 +3875,7 @@ function whiteboardIsEraser(status) {
     setColor(whiteboardEraserBtn, wbIsEraser ? 'green' : 'white');
 }
 
-function whiteboardAddObj(type) {
+async function whiteboardAddObj(type) {
     switch (type) {
         case 'imgUrl':
             Swal.fire({
@@ -3396,9 +3890,10 @@ function whiteboardAddObj(type) {
                 if (result.isConfirmed) {
                     let wbCanvasImgURL = result.value;
                     if (isImageURL(wbCanvasImgURL)) {
-                        fabric.Image.fromURL(wbCanvasImgURL, function (myImg) {
-                            addWbCanvasObj(myImg);
-                        });
+                        realWhiteBoard.createImageFromURL(wbCanvasImgURL);
+                        //fabric.Image.fromURL(wbCanvasImgURL, function (myImg) {
+                        //    addWbCanvasObj(myImg);
+                        //});
                     } else {
                         userLog('error', 'The URL is not a valid image', 'top-end');
                     }
@@ -3412,17 +3907,39 @@ function whiteboardAddObj(type) {
             setupFileSelection('Select the PDF', wbPdfInput, renderPdfToCanvas);
             break;
         case 'text':
-            const text = new fabric.IText('Lorem Ipsum', {
+           /* const text = new fabric.IText('Lorem Ipsum', {
                 top: 0,
                 left: 0,
                 fontFamily: 'Comfortaa',
                 fill: wbCanvas.freeDrawingBrush.color,
                 strokeWidth: wbCanvas.freeDrawingBrush.width,
                 stroke: wbCanvas.freeDrawingBrush.color,
+            });*/
+            Swal.fire({
+                background: swalBackground,
+                title: 'Enter the text',
+                input: 'text',
+                showCancelButton: true,
+                confirmButtonText: 'OK',
+                showClass: {
+                    popup: 'animate__animated animate__fadeInDown',
+                },
+                hideClass: {
+                    popup: 'animate__animated animate__fadeOutUp',
+                },
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    let wbCanvasText = result.value;
+                    if (wbCanvasText) {
+                        realWhiteBoard.createText(wbCanvasText);
+                    }
+                }
             });
-            addWbCanvasObj(text);
+            //addWbCanvasObj(text);
             break;
         case 'line':
+            realWhiteBoard.whiteboardSetDrawingMode("line"); 
+            /*
             const line = new fabric.Line([50, 100, 200, 200], {
                 top: 0,
                 left: 0,
@@ -3430,18 +3947,22 @@ function whiteboardAddObj(type) {
                 strokeWidth: wbCanvas.freeDrawingBrush.width,
                 stroke: wbCanvas.freeDrawingBrush.color,
             });
-            addWbCanvasObj(line);
+            addWbCanvasObj(line);*/
             break;
         case 'circle':
+            realWhiteBoard.whiteboardSetDrawingMode("circle");
+            /*
             const circle = new fabric.Circle({
                 radius: 50,
                 fill: 'transparent',
                 stroke: wbCanvas.freeDrawingBrush.color,
                 strokeWidth: wbCanvas.freeDrawingBrush.width,
             });
-            addWbCanvasObj(circle);
+            addWbCanvasObj(circle);*/
             break;
         case 'rect':
+            realWhiteBoard.whiteboardSetDrawingMode("rect");
+            /*
             const rect = new fabric.Rect({
                 top: 0,
                 left: 0,
@@ -3451,7 +3972,7 @@ function whiteboardAddObj(type) {
                 stroke: wbCanvas.freeDrawingBrush.color,
                 strokeWidth: wbCanvas.freeDrawingBrush.width,
             });
-            addWbCanvasObj(rect);
+            addWbCanvasObj(rect);*/
             break;
         case 'triangle':
             const triangle = new fabric.Triangle({
@@ -3465,6 +3986,177 @@ function whiteboardAddObj(type) {
             });
             addWbCanvasObj(triangle);
             break;
+
+
+        case 'arrow':
+            realWhiteBoard.whiteboardSetDrawingMode("arrow");
+            break;
+        case 'decal':
+            realWhiteBoard.whiteboardSetDrawingMode("none");
+            const { value: decal } = await Swal.fire({
+                allowOutsideClick: false,
+                background: swalBackground,
+                position: 'center',
+                title: 'Select the decal',
+                input: 'select',
+                inputOptions: {                   
+                    'warning': 'Warning',
+                    'atom': 'Atom',
+                    'crush': 'Crush',
+                    'death': 'Death',
+                    'dpiwhite': 'DPI',
+                    'explode': 'Explode',
+                    'fire': 'Fire',
+                    'hightemp': 'Temperature',
+                    'moving': 'Moving',
+                    'radiation': 'Radioactivity',
+                    'readmanual': 'Manual',
+                    'toxic': 'Toxic',
+                    'voltage': 'Voltage',
+                    },
+                    inputPlaceholder: 'Select a decal',
+                    inputValidator: (value) => {
+                    return new Promise((resolve) => {
+                        if (value != 'oranges') {
+                        resolve()
+                        } else {
+                        resolve('You need to select a decal! :)')
+                        }
+                    })
+                    },
+                showClass: {
+                    popup: 'animate__animated animate__fadeInDown',
+                },
+                hideClass: {
+                    popup: 'animate__animated animate__fadeOutUp',
+                },
+            })
+
+            if(decal){
+                console.log(decal);
+                realWhiteBoard.createDecal("/images/decals/" + decal + ".png");
+            }
+
+            break;
+    
+            case 'opacity':
+    
+    
+                const inputValue = realWhiteBoard.wbOpacity;
+                const inputStep = 1;
+                const inputMin = 0;
+                const inputMax = 255;
+    
+                Swal.fire({
+                    background: swalBackground,
+                    title: 'Choose fill opacity [0...255]',
+                    html: `
+                        <input
+                        type="number"
+                        value="${inputValue}"
+                        step="${inputStep}"
+                        min="${inputMin}"
+                        max="${inputMax}"
+                        class="swal2-input"
+                        id="range-value">`,
+                    input: 'range',
+                    inputValue,
+                    inputAttributes: {
+                        min: 0,
+                        max: 255,
+                        step: inputStep
+                    },
+                    didOpen: () => {
+                        const inputRange = Swal.getInput()
+                        const inputNumber = Swal.getHtmlContainer().querySelector('#range-value')
+    
+                        // remove default output
+                        inputRange.nextElementSibling.style.display = 'none'
+                        inputRange.style.width = '100%'
+    
+                        // sync input[type=number] with input[type=range]
+                        inputRange.addEventListener('input', () => {
+                        inputNumber.value = inputRange.value
+                        })
+    
+                        // sync input[type=range] with input[type=number]
+                        inputNumber.addEventListener('change', () => {
+                        inputRange.value = inputNumber.value
+                        })
+                    }
+                }).then((result) => {
+                    if (result.isConfirmed) {
+    
+                        //console.log(realWhiteBoard.wbFillColor);
+    
+                        let wbalpha = result.value;
+                        if (wbalpha) {
+                            
+                            realWhiteBoard.wbOpacity = wbalpha;
+                            
+                            // we must convert the wbfillcolor to an alpha value
+                            var decimal = parseInt(wbalpha);
+                            // convert to hex
+                            var myhex = decimal.toString(16).toUpperCase();
+                            
+                            // take in account the fact that we need always a two digit string
+                            if(decimal < 16)
+                                myhex = '0' + myhex;
+    
+                            realWhiteBoard.wbOpacityHex = myhex;
+    
+                            // we can have two different format:
+                            // 1) #ffffffff
+                            // 2) #ffffff
+                            if(realWhiteBoard.wbFillColor.length == 7)
+                            {
+                                realWhiteBoard.wbFillColor = realWhiteBoard.wbFillColor + myhex;
+                            }
+                            else
+                            {
+                                realWhiteBoard.wbFillColor = realWhiteBoard.wbFillColor.slice(0, realWhiteBoard.wbFillColor.length - 2) + myhex;
+                            }
+                        }
+                    }
+                });
+    
+          
+    
+                /*    Swal.fire({
+                        background: swalBackground,
+                        title: 'Choose fill opacity',
+                        input: 'range',
+                        inputLabel: 'alpha',
+                        inputAttributes: {
+                            min: 0,
+                            max: 255,
+                            step: 1
+                        },
+                        inputValue: 0,
+                        showCancelButton: false,
+                        confirmButtonText: 'OK',
+                        showClass: {
+                            popup: 'animate__animated animate__fadeInDown',
+                        },
+                        hideClass: {
+                            popup: 'animate__animated animate__fadeOutUp',
+                        },
+                    }).then((result) => {
+                        if (result.isConfirmed) {
+                            let wbalpha = result.value;
+                            if (wbalpha) {
+                                //realWhiteBoard.createText(wbCanvasText);
+                            }
+                        }
+                    });*/
+    
+    
+    
+    
+                break;
+
+
+
         default:
             break;
     }
@@ -3548,9 +4240,10 @@ function renderImageToCanvas(wbCanvasImg) {
             let imgObj = new Image();
             imgObj.src = event.target.result;
             imgObj.onload = function () {
-                let image = new fabric.Image(imgObj);
-                image.set({ top: 0, left: 0 }).scale(0.3);
-                addWbCanvasObj(image);
+                //let image = new fabric.Image(imgObj);
+                //image.set({ top: 0, left: 0 }).scale(0.3);
+                //addWbCanvasObj(image);
+                realWhiteBoard.createImage(imgObj);
             };
         };
         reader.readAsDataURL(wbCanvasImg);
@@ -3686,8 +4379,23 @@ function objectAdded() {
 function wbCanvasBackgroundColor(color) {
     document.documentElement.style.setProperty('--wb-bg', color);
     wbBackgroundColorEl.value = color;
-    wbCanvas.setBackgroundColor(color);
-    wbCanvas.renderAll();
+    //wbCanvas.setBackgroundColor(color);
+    //wbCanvas.renderAll();
+    realWhiteBoard.wbCanvas.setBackgroundColor(color);
+    realWhiteBoard.wbCanvas.renderAll();
+}
+
+function wbCanvasForegroundColor(color) {
+    wbDrawingColorEl.value = color;
+    realWhiteBoard.wbCanvas.freeDrawingBrush.color = color;
+    realWhiteBoard.wbCanvas.renderAll();
+}
+
+function wbCanvasFillColor(color) {
+    wbFillColorEl.value = color;
+    realWhiteBoard.wbFillColor = color /*+ realWhiteBoard.wbOpacityHex*/;
+    //realWhiteBoard.wbFillColor = color;
+    realWhiteBoard.wbCanvas.renderAll();
 }
 
 function wbCanvasUndo() {
@@ -3705,7 +4413,7 @@ function wbCanvasRedo() {
 }
 
 function wbCanvasSaveImg() {
-    const dataURL = wbCanvas.toDataURL({
+   /*const dataURL = wbCanvas.toDataURL({
         width: wbCanvas.getWidth(),
         height: wbCanvas.getHeight(),
         left: 0,
@@ -3715,7 +4423,92 @@ function wbCanvasSaveImg() {
     const dataNow = getDataTimeString();
     const fileName = `whiteboard-${dataNow}.png`;
     saveDataToFile(dataURL, fileName);
+    */
+    const dataURL = realWhiteBoard.wbCanvas.toDataURL({
+        width: realWhiteBoard.wbCanvas.getWidth(),
+        height: realWhiteBoard.wbCanvas.getHeight(),
+        left: 0,
+        top: 0,
+        format: 'png',
+    });
+    const dataNow = getDataTimeString();
+    const fileName = `whiteboard-${dataNow}.png`;
+    saveDataToFile(dataURL, fileName);
+    saveImageLog();
+
 }
+
+function OpenWhiteBoardAfterSnapShot(){
+    if (!wbIsOpen) toggleWhiteboard();
+} 
+
+function SingleJsonToWbCanvas(json) {
+    if (!wbIsOpen) toggleWhiteboard();
+
+    realWhiteBoard.loadFromSingleJSON(json);
+    realWhiteBoard.wbCanvas.renderAll();
+    realWhiteBoard.revivePointer();
+}
+
+function ModifyCommand(jsontext) {
+
+    //console.log("we are moving object!");
+    
+
+    // convert the text to a json object for easy of use
+    var jsonCommand = JSON.parse(jsontext);
+
+    //console.log(jsonCommand);
+
+    // cycle all objects
+    for(var k in realWhiteBoard.wbCanvas.getObjects()) {
+        //console.log(realWhiteBoard.wbCanvas._objects[k]);
+
+
+        if( realWhiteBoard.wbCanvas._objects[k].type == "image" ||
+            realWhiteBoard.wbCanvas._objects[k].type == "rect" ||
+            realWhiteBoard.wbCanvas._objects[k].type == "line" ||
+            realWhiteBoard.wbCanvas._objects[k].type == "ellipse" ||
+            realWhiteBoard.wbCanvas._objects[k].type == "text" ||
+            realWhiteBoard.wbCanvas._objects[k].type == "path" 
+            )
+        {
+            
+            // check if it is the right object
+            if(jsonCommand.elementID == realWhiteBoard.wbCanvas._objects[k].elementID)
+            {
+                //console.log("is it!");
+                realWhiteBoard.wbCanvas._objects[k].set({ 
+                    left: jsonCommand.target.left, 
+                    top: jsonCommand.target.top,
+                    scaleX: jsonCommand.target.scaleX,
+                    scaleY: jsonCommand.target.scaleY,
+                    angle: jsonCommand.target.angle
+                });
+                realWhiteBoard.wbCanvas.renderAll();
+            }
+        }
+
+        
+    }   
+}
+
+// delete the object, the command comes from remote partecipants
+function DeleteCommand(elementID){
+    //console.log(elementID);
+    // cycle all objects
+    for(var k in realWhiteBoard.wbCanvas.getObjects()) {
+        //console.log(realWhiteBoard.wbCanvas._objects[k]);
+            // check if it is the right object
+            if( (typeof realWhiteBoard.wbCanvas._objects[k] !== "undefined") && (elementID == realWhiteBoard.wbCanvas._objects[k].elementID))
+            {
+                //console.log("is it!");
+                realWhiteBoard.wbCanvas.remove(realWhiteBoard.wbCanvas._objects[k]);
+                realWhiteBoard.wbCanvas.renderAll();
+            }
+    }   
+}
+
 
 function wbUpdate() {
     if (wbIsOpen && (!isRulesActive || isPresenter)) {
@@ -3725,21 +4518,28 @@ function wbUpdate() {
     }
 }
 
-function wbCanvasToJson() {
+/*function wbCanvasToJson() {
     if (!isPresenter && wbIsLock) return;
     if (rc.thereAreParticipants()) {
-        let wbCanvasJson = JSON.stringify(wbCanvas.toJSON());
+        let wbCanvasJson = JSON.stringify(realWhiteBoard.wbCanvas.toJSON());
         rc.socket.emit('wbCanvasToJson', wbCanvasJson);
     }
-}
+}*/
 
 function JsonToWbCanvas(json) {
     if (!wbIsOpen) toggleWhiteboard();
-    wbCanvas.loadFromJSON(json);
-    wbCanvas.renderAll();
+    //wbCanvas.loadFromJSON(json);
+    //wbCanvas.renderAll();
+    realWhiteBoard.wbCanvas.loadFromJSON(json);
+    realWhiteBoard.wbCanvas.renderAll();
+    realWhiteBoard.revivePointer();
     if (!isPresenter && !wbCanvas.isDrawingMode && wbIsLock) {
         wbDrawing(false);
     }
+}
+
+function ImportPictureFromVuzix(data){
+    realWhiteBoard.createImageFromURL(data, false);
 }
 
 function getWhiteboardAction(action) {
@@ -3795,6 +4595,7 @@ function whiteboardAction(data, emit = true) {
             rc.socket.emit('whiteboardAction', data);
         }
     } else {
+        if(data.action != "pointer" && data.action != "screenshot" && data.action != "bigpicture")
         userLog(
             'info',
             `${data.peer_name} <i class="fas fa-chalkboard-teacher"></i> whiteboard action: ${data.action}`,
@@ -3806,14 +4607,25 @@ function whiteboardAction(data, emit = true) {
         case 'bgcolor':
             wbCanvasBackgroundColor(data.color);
             break;
+        case 'fgcolor':
+            wbCanvasForegroundColor(data.color);
+            break;
+        case 'flcolor':
+            wbCanvasFillColor(data.color);
+            break;            
         case 'undo':
-            wbCanvasUndo();
+           //wbCanvasUndo();
+           realWhiteBoard.undo();
             break;
         case 'redo':
-            wbCanvasRedo();
+            //wbCanvasRedo();
+            realWhiteBoard.redo();
             break;
         case 'clear':
-            wbCanvas.clear();
+            //wbCanvas.clear();
+            saveImageLog(); // save log moment on cloud
+            realWhiteBoard.wbCanvas.clear();
+
             break;
         case 'lock':
             if (!isPresenter) {
@@ -3835,6 +4647,21 @@ function whiteboardAction(data, emit = true) {
             break;
         case 'close':
             if (wbIsOpen) toggleWhiteboard();
+            break;
+
+        case 'pointer':
+            realWhiteBoard.movePointer(data.x,data.y);
+            break;
+        case 'screenshot':            
+            realWhiteBoard.wbCanvas.clear();
+            realWhiteBoard.whiteboardSetDrawingMode("draw");
+            realWhiteBoard.createImageFromURL(data.image, true);            
+            //saveImageLog(); // save log moment on cloud
+            break;
+        case 'bigpicture':            
+            realWhiteBoard.wbCanvas.clear();
+            realWhiteBoard.whiteboardSetDrawingMode("draw");   
+            realWhiteBoard.saveBigPicture("data:image/jpg;base64," + data.image);
             break;
         default:
             break;

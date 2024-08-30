@@ -112,6 +112,8 @@
 
         <!-- Js scripts https://cdn.jsdelivr.net -->
 
+        <script defer src="../js/jscolor.js"></script>
+
         <script defer src="/socket.io/socket.io.js"></script>
         <script defer src="../sfu/MediasoupClient.js"></script>
         <script defer src="https://cdn.jsdelivr.net/npm/xss/dist/xss.min.js"></script>
@@ -123,6 +125,9 @@
         <script defer src="../js/VideoGrid.js"></script>
         <script defer src="../js/RoomClient.js"></script>
         <script defer src="../js/Room.js"></script>
+        <script defer src="../js/WhiteBoard.js"></script>
+        
+
         <script defer src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
         <script defer src="https://cdn.jsdelivr.net/npm/detectrtc@1.4.1/DetectRTC.min.js"></script>
         <script defer src="https://cdn.jsdelivr.net/npm/qrious@4.0.2/dist/qrious.min.js"></script>
@@ -186,6 +191,8 @@ access to use this app.
             <button id="transcriptionButton" class="hidden"><i class="fas fa-closed-captioning"></i></button>
             <button id="pollButton" class="hidden"><i class="fas fa-square-poll-horizontal"></i></button>
             <button id="editorButton" class="hidden"><i class="fas fa-pen-to-square"></i></button>
+            <button id="startProRecButton" class="hidden"><i class="fas fa-save"></i></button>
+            <button id="stopProRecButton" class="hidden"><i class="fas fa-save"></i></button>
             <button id="whiteboardButton" class="hidden"><i class="fas fa-chalkboard-teacher"></i></button>
             <button id="snapshotRoomButton" class="hidden"><i class="fas fas fa-camera-retro"></i></button>
             <button id="settingsButton" class="hidden"><i class="fas fa-cogs"></i></button>
@@ -1248,7 +1255,12 @@ access to use this app.
                     <button id="whiteboardGhostButton" class="fas fa-circle-half-stroke"></button>
                     <button id="whiteboardGridBtn" class="fas fa-table-cells-large hidden"></button>
                     <input id="wbBackgroundColorEl" class="whiteboardColorPicker" type="color" value="#000000" />
-                    <input id="wbDrawingColorEl" class="whiteboardColorPicker" type="color" value="#FFFFFF" />
+                    <!-- <input id="wbDrawingColorEl" class="whiteboardColorPicker" type="color" value="#FFFFFF" /> -->
+                    <input data-jscolor="{closeButton:true, closeText:'OK', value:'#FF0000', backgroundColor:'#111', buttonColor:'#FFF', palette:'rgba(0,0,0,0) #fff #808080 #000 #996e36 #f55525 #ffe438 #88dd20 #22e0cd #269aff #bb1cd4',
+                    paletteCols:11, hideOnPaletteClick:true}" id="wbDrawingColorEl" class="whiteboardColorPicker" />
+                    <input data-jscolor="{closeButton:true, closeText:'OK', value:'#00000000', position:'bottom', height:80, backgroundColor:'#111', buttonColor:'FFF',
+                    palette:'rgba(0,0,0,0) #fff #808080 #000 #996e36 #f55525 #ffe438 #88dd20 #22e0cd #269aff #bb1cd4',
+                    paletteCols:11, hideOnPaletteClick:true}" id="wbFillColorEl" class="whiteboardColorPicker" />
                     <button id="whiteboardPencilBtn" class="fas fa-pencil-alt"></button>
                     <button id="whiteboardObjectBtn" class="fas fa-mouse-pointer"></button>
                     <button id="whiteboardUndoBtn" class="fas fa-undo"></button>
@@ -1269,8 +1281,9 @@ access to use this app.
                             <button id="whiteboardPdfFileBtn"><i class="far fa-file-pdf"></i> Add pdf file</button>
                             <button id="whiteboardTextBtn"><i class="fas fa-spell-check"></i> Add text</button>
                             <button id="whiteboardLineBtn"><i class="fas fa-slash"></i> Add line</button>
+                            <button id="whiteboardArrowBtn"><i class="fas fa-long-arrow-right"></i> Add Arrow</button>
                             <button id="whiteboardRectBtn"><i class="far fa-square"></i> Add rectangle</button>
-                            <button id="whiteboardTriangleBtn">
+                            <button id="whiteboardTriangleBtn" style="visibility: hidden;">
                                 <svg
                                     xmlns="http://www.w3.org/2000/svg"
                                     width="1em"
@@ -1286,6 +1299,8 @@ access to use this app.
                             <button id="whiteboardSaveBtn"><i class="fas fa-save"></i> Save</button>
                             <button id="whiteboardEraserBtn"><i class="fas fa-eraser"></i> Eraser</button>
                             <button id="whiteboardCleanBtn"><i class="fas fa-trash"></i> Clean</button>
+                            <button id="whiteboardPointerBtn"><i  class="fas fa-crosshairs"></i> Laser Pointer</button>
+                            <button id="whiteboardDecalBtn"><i class="fas fa-exclamation-triangle"></i> Decals</button>
                         </div>
                     </div>
                 </div>
@@ -1480,7 +1495,39 @@ access to use this app.
                             <button id="chatCleanTextButton" class="float-left mr5 hidden">
                                 <i class="fas fa-trash"></i>
                             </button>
-                            <button id="chatSendButton" class="float-right hidden">
+                            <select id="langselect" style="width:120px; height: auto" class="form-select text-light bg-dark">
+                                <option value="--">None</option>
+                                <option value="EN-US">English</option>
+                                <option value="IT">Italian</option>
+                                <option value="EL">Greek</option>
+                                <option value="ES">Spanish</option>
+                                <option value="PT-BR">Portuguese</option>
+                                <option value="DE">German</option>
+                                <option value="FR">French</option>
+                                <option value="RU">Russian</option>
+                                <option value="JA">Japanese</option>
+                                <option value="ZH">Chinese</option>
+                                <option value="BG">Bulgarian</option>
+                                <option value="CS">Czech</option>
+                                <option value="DA">Danish</option>
+                                <option value="ET">Estonian</option>
+                                <option value="FI">Finnish</option>
+                                <option value="HU">Hungarian</option>
+                                <option value="ID">Indonesian</option>
+                                <option value="KO">Korean</option>
+                                <option value="LT">Lithuanian</option>
+                                <option value="LV">Latvian</option>
+                                <option value="NB">Norwegian</option>
+                                <option value="NL">Dutch</option>
+                                <option value="PL">Polish</option>
+                                <option value="RO">Romanian</option>
+                                <option value="SK">Slovak</option>
+                                <option value="SL">Slovenian</option>
+                                <option value="SV">Swedish</option>
+                                <option value="TR">Turkish</option>
+                                <option value="UK">Ukranian</option>
+                            </select>
+                            <button id="chatSendButton" style="margin-top: -32px" class="float-right hidden">
                                 <i class="fas fa-paper-plane"></i>
                             </button>
                         </div>
