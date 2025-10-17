@@ -10,6 +10,7 @@ Certificati
 certbot aggiorna in automatico i cetificati, ma ogni tre mesi va riavviato RoomXR e soprattutto vanno copiati i certificati con questi comandi:
 sudo cp /etc/letsencrypt/live/roomxr.eu/privkey.pem /home/enzo_francesca/keys/
 sudo cp /etc/letsencrypt/live/roomxr.eu/fullchain.pem /home/enzo_francesca/keys/
+DOBBIAMO FARE UN CRON CHE LO FACCIA IN AUTOMATICO
 
 
 

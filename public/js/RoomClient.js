@@ -1603,6 +1603,7 @@ class RoomClient {
         let elem, vb, d, p, i, cm, au, fs, ts, sf, sm, sv, ko, pb, pm, pv, pn, bp;
 
         console.log('PEER-INFO', peer_info);
+        console.log( DetectRTC.browser.name);
 
         let remotePeerId = peer_info.peer_id;
         let remoteIsScreen = type == mediaType.screen;
@@ -1626,6 +1627,7 @@ class RoomClient {
                 elem.controls = isVideoControlsOn;
                 elem.autoplay = true;
                 elem.className = '';
+                elem.className = (isGlasses &&  DetectRTC.browser.name == "Firefox")  ? 'upsidedown' : '';
                 elem.poster = image.poster;
                 elem.style.objectFit = remoteIsScreen ? 'contain' : 'var(--videoObjFit)';
                 vb = document.createElement('div');

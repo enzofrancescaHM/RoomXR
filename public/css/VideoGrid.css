@@ -206,6 +206,16 @@ video:fullscreen {
     transform: rotateY(180deg);
 }
 
+.upsidedown{
+    -webkit-transform: rotateY(180deg);
+    -moz-transform: rotateY(180deg);
+    transform: rotateY(180deg);
+    -webkit-transform: rotateZ(180deg);
+    -moz-transform: rotateZ(180deg);
+    transform: rotateZ(180deg);
+
+}
+
 .blur {
     -webkit-filter: blur(5px);
     -moz-filter: blur(5px);
