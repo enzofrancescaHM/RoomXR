@@ -75,9 +75,10 @@ let room_id = getRoomId();
 let room_password = getRoomPassword();
 let peer_name = getPeerName();
 let notify = getNotify();
-let is_pro =  getIsPro();
+let is_pro = getIsPro();
 let loginParametersMail = getParMail();
 let loginParametersCompany = getParCompany();
+let loginFaceDetection = getFaceDetection();
 
 let peer_geo = null;
 let peer_info = null;
@@ -127,6 +128,8 @@ let currentSessionID = null;
 let imageSessionCounter = 0;
 let sessionTimer = null;
 let initStream = null;
+
+let faceCanvasResized = false;
 
 // ####################################################
 // INIT ROOM
@@ -208,13 +211,184 @@ function initClient() {
     initEnumerateDevices();
 
     // if is RoomXR PRO then disable fadeout
-    if (getIsPro())
-    {
+    if (getIsPro()) {
         //var mycontrols = document.getElementById("control");
         control.style.display = 'flex';
 
     }
+
+
+
+    // EXPERIMENTAL: init face detection if loginParametersFace is true
+    if (loginFaceDetection === "true") {
+        console.log("Face detection enabled");
+
+        setTimeout(function () {
+            initFaceDetection()
+        }, 3000);
+
+    }
+    else {
+        console.log("Face detection disabled");
+    }
+
+
 }
+
+async function initFaceDetection() {
+    const MODEL_URL = 'https://roomxr.eu/js/models';
+    const TINY_FACE_DETECTOR = 'tiny_face_detector';
+    const SSD_MOBILENETV1 = 'ssd_mobilenetv1';
+    let selectedFaceDetector = TINY_FACE_DETECTOR;
+
+
+    await faceapi.loadTinyFaceDetectorModel(MODEL_URL);
+    console.log('Face Detector model loaded');
+    runFaceDetector();
+}
+
+async function runFaceDetector() {
+    //console.log("Running face detector");
+
+    var clist = document.getElementsByClassName("Camera");
+
+    if (clist.length == 0) {
+        console.log("no video element found");
+        return setTimeout(() => runFaceDetector(), 3000);
+    }
+
+    // check if the element has a child with the username class
+    let found = false;
+    let videoElement = null;
+    let canvasElement = null;
+    let canvasElement2 = null;
+    let fatherElement = null;
+
+    for (let i = 0; i < clist.length; i++) {
+        let el = clist[i];
+        let ulist = el.getElementsByClassName("username");
+        if (ulist.length > 0) {
+            let usernameEl = ulist[0];
+            
+            if (usernameEl.innerText.includes("(me)") == false) {
+
+                // get the video element inside
+                let vlist = el.getElementsByTagName("video");
+                if (vlist.length > 0) {
+                    //console.log("******************** found video element");
+                    videoElement = vlist[0];
+                }
+
+                let clist = el.getElementsByTagName("canvas");
+                if (clist.length > 0) {
+                    //console.log("********************* found canvas element");
+                    //console.log(clist[0]);
+
+                    canvasElement = clist[0];
+                    canvasElement2 = clist[1];
+
+                    if (faceCanvasResized == false) {
+                        console.log("********************* resizing canvas element");
+                        console.log(videoElement.offsetWidth);
+                        console.log(videoElement.offsetWidth);
+
+                        faceCanvasResized = true;
+                    }
+
+
+                }
+
+                // found it
+                if (videoElement != null && canvasElement != null) {
+                    fatherElement = el;
+                    found = true;
+                    break;
+                }
+
+            }
+        }
+    }
+
+    if (!found) {
+        faceCanvasResized = false;
+        console.log("no video element with guest user found");
+        return setTimeout(() => runFaceDetector(), 3000);
+    }
+
+    const videoEl = videoElement;
+    const canvas = canvasElement;
+
+    const context = canvas.getContext("2d");
+
+    let inputSize = 512;
+    let scoreThreshold = 0.2;
+    
+    const pixvalue = 16;
+
+    // loop until condition are satisfied
+    if (videoEl == null || videoEl.paused || videoEl.ended || videoEl.offsetWidth === 0 || videoEl.offsetHeight === 0) {
+        console.log("waiting");
+        return setTimeout(() => runFaceDetector(), 3000);
+    }
+
+    const options = new faceapi.TinyFaceDetectorOptions({ inputSize, scoreThreshold });
+    const result = await faceapi.detectAllFaces(videoEl, options)
+
+    if (result) {
+        //console.log("result!");
+
+        var redDetect = true;
+        var pixDetect = false;
+
+        
+
+        //const detectionsForSize = faceapi.resizeResults(result, dims);
+        const displaySize = { width: videoEl.offsetWidth*2, height: videoEl.offsetHeight };
+        //console.log(displaySize);
+
+        if (videoEl.offsetWidth === 0 || videoEl.offsetHeight === 0) { }
+        else {
+            faceapi.matchDimensions(canvas, displaySize);
+            const resizedDetections = faceapi.resizeResults(result, displaySize);
+            //faceapi.draw.drawDetections(canvas, resizedDetections);
+
+            if (resizedDetections.length > 0) {
+                resizedDetections.forEach(element => {
+
+                    if (redDetect) {
+                        context.beginPath();
+                        context.strokeStyle = "#000000";
+                        context.fillStyle = "#000000FF"
+                        context.lineWidth = "1.0";
+                        context.moveTo(element._box._x, element._box._y);
+                        context.rect(element._box._x, element._box._y, element._box._width,element._box._height);
+                        context.fill();
+
+                    }
+
+                    // pixelate effect
+                    // sortof..
+                    if (pixDetect) {
+                        context.mozImageSmoothingEnabled = false;
+                        context.webkitImageSmoothingEnabled = false;
+                        context.imageSmoothingEnabled = false;
+                        context.drawImage(videoEl, element._box._x, element._box._y, element._box._width, element._box._height, element._box._x, element._box._y, element._box._width / pixvalue, element._box._height / pixvalue);
+                        context.drawImage(canvas, element._box._x, element._box._y, element._box._width / pixvalue, element._box._height / pixvalue, element._box._x, element._box._y, element._box._width, element._box._height);
+                    }
+
+                });
+            }
+
+        }
+      
+    }
+
+    setTimeout(() => runFaceDetector())
+
+}
+
+
+
 
 // ####################################################
 // HANDLE TOOLTIP
@@ -222,7 +396,7 @@ function initClient() {
 
 function setTippy(elem, content, placement, allowHTML = false) {
     //return;
-   
+
 
     try {
         tippy(document.getElementById(elem), {
@@ -246,6 +420,15 @@ function getIsPro() {
     console.log(isPro);
     return isPro;
 }
+
+function getFaceDetection() {
+    let qs = new URLSearchParams(window.location.search);
+    let queryFace = qs.get('face');
+    let isFace = queryFace ? queryFace : "false";
+    console.log(isFace);
+    return isFace;
+}
+
 
 function getParMail() {
     let qs = new URLSearchParams(window.location.search);
@@ -541,15 +724,14 @@ function whoAreYou() {
         default_name = getCookie(room_id + '_name');
     }
 
-    if(peer_name)
-    {
+    if (peer_name) {
         default_name = peer_name;
     }
 
     const initUser = document.getElementById('initUser');
     initUser.classList.toggle('hidden');
 
-    
+
 
     Swal.fire({
         allowOutsideClick: false,
@@ -668,7 +850,7 @@ async function shareRoom(useNavigator = false) {
     var finurl = RoomURL;
 
     // if we are pro then the share button must share the right parameters
-    if(getIsPro()){
+    if (getIsPro()) {
 
         // https://roomxr.eu/join/pippo@formaggio.eu?audio=1&video=1&notify=0&pro=true&name=Pippo&mail=pippo.formaggio@formaggio.eu&company=asiago
         const url_base = finurl.split('?')[0];
@@ -683,7 +865,7 @@ async function shareRoom(useNavigator = false) {
 
         // rebuild the string
         finurl = url_base + "?audio=" + url_audio + "&video=" + url_video + "&notify=" + url_notify + "&name=Guest" /*+ "&date=" + ""*/;
-        
+
 
     }
 
@@ -879,8 +1061,7 @@ function roomIsReady() {
         lockRoomButton.click();
     }
 
-    if(is_pro)
-    {
+    if (is_pro) {
         show(startProRecButton);
         hide(exitButton);
         hide(aboutButton);
@@ -1220,9 +1401,9 @@ function handleButtons() {
 // SESSIONS
 // ####################################################
 
-function saveImageLog(){
+function saveImageLog() {
     // this is a good place to save the image logs on the server for the pro version.
-    if(getIsPro() && currentSessionID != "-") // check if we ar in pro and if there is a session
+    if (getIsPro() && currentSessionID != "-") // check if we ar in pro and if there is a session
     {
         console.log("saveImageLog:");
         console.log(currentSessionID);
@@ -1231,15 +1412,15 @@ function saveImageLog(){
         var dataurl = realWhiteBoard.wbCanvas.toDataURL({
             format: 'jpeg',
             quality: 0.8
-            });
+        });
 
         // convert to blob in order to send via web api
         var arr = dataurl.split(','), mime = arr[0].match(/:(.*?);/)[1],
-        bstr = atob(arr[1]), n = bstr.length, u8arr = new Uint8Array(n);
+            bstr = atob(arr[1]), n = bstr.length, u8arr = new Uint8Array(n);
         while (n--) {
             u8arr[n] = bstr.charCodeAt(n);
         }
-        var blob =  new Blob([u8arr], { type: mime });
+        var blob = new Blob([u8arr], { type: mime });
 
         // now, this must be sent as a file
         filesHandlerCloud(blob, false); // this function is
@@ -1248,23 +1429,23 @@ function saveImageLog(){
 }
 
 async function createNewSession() {
-	// safe mechanism to avoid update before creating a new session
-	currentSessionID = "-";
+    // safe mechanism to avoid update before creating a new session
+    currentSessionID = "-";
 
-	var url = APIPath + "/posts/createsessionv2";
+    var url = APIPath + "/posts/createsessionv2";
 
     // collect the partecipant name... we take the first one
     var remName = await getFirstPartecipantName();
-   
-    
+
+
     var data = JSON.stringify({
-		device: remName,
-		datestart: Date.now(),
-		dateend: Date.now(),
-		email: loginParametersMail,
-		company: loginParametersCompany,
-        url:url
-	});
+        device: remName,
+        datestart: Date.now(),
+        dateend: Date.now(),
+        email: loginParametersMail,
+        company: loginParametersCompany,
+        url: url
+    });
 
     var resp = await rc.getNewSessionID(data);
     currentSessionID = resp;
@@ -1273,12 +1454,12 @@ async function createNewSession() {
 }
 
 function updateSession(actiontype, event) {
-	
-    
+
+
     // safe mechanism to avoid update before creating a new session
-	if (currentSessionID === "-")
-		return;
-	
+    if (currentSessionID === "-")
+        return;
+
     var url = APIPath + "/posts/updatesessionv2";
     var rheaders = new Headers({
         'Content-Type': 'application/json',
@@ -1286,93 +1467,93 @@ function updateSession(actiontype, event) {
 
 
     var realAction = "";
-	var realImage = "";
-	var realEvent = "";
+    var realImage = "";
+    var realEvent = "";
 
-	if (actiontype === "date") {
-		realAction = "date";
-	}
-	if (actiontype === "image") {
-		realAction = "image";
-		realImage = event;
-	}
-	if (actiontype === "clearing") {
-		realAction = "clearing";
-	}
-	if (actiontype === "drawLine") {
-		realAction = "line";
-		realEvent = event;
-	}
-	if (actiontype === "drawArrow") {
-		realAction = "arrow";
-		realEvent = event;
-	}
-	if (actiontype === "drawRect") {
-		realAction = "rect";
-		realEvent = event;
-	}
-	if (actiontype === "drawCircle") {
-		realAction = "circle";
-		realEvent = event;
-	}
-	if (actiontype === "drawPoint") {
-		realAction = "point";
-		realEvent = event;
-	}
-	if (actiontype === "drawStroke") {
-		realAction = "stroke";
-		realEvent = event;
-	}
-	if (actiontype === "drawBufferPoints") {
-		realAction = "buffer";
-		realEvent = event;
-	}
-	if (actiontype === "chat") {
-		realAction = "chat";
-		realEvent = event;
-	}
-	if (actiontype === "note") {
-		realAction = "note";
-		realEvent = event;
-	}
-	if (actiontype === "drawText") {
-		realAction = "text";
-		realEvent = event;
-	}
-	if (actiontype === "drawDecal") {
-		realAction = "decal";
-		realEvent = event;
-	}
+    if (actiontype === "date") {
+        realAction = "date";
+    }
+    if (actiontype === "image") {
+        realAction = "image";
+        realImage = event;
+    }
+    if (actiontype === "clearing") {
+        realAction = "clearing";
+    }
+    if (actiontype === "drawLine") {
+        realAction = "line";
+        realEvent = event;
+    }
+    if (actiontype === "drawArrow") {
+        realAction = "arrow";
+        realEvent = event;
+    }
+    if (actiontype === "drawRect") {
+        realAction = "rect";
+        realEvent = event;
+    }
+    if (actiontype === "drawCircle") {
+        realAction = "circle";
+        realEvent = event;
+    }
+    if (actiontype === "drawPoint") {
+        realAction = "point";
+        realEvent = event;
+    }
+    if (actiontype === "drawStroke") {
+        realAction = "stroke";
+        realEvent = event;
+    }
+    if (actiontype === "drawBufferPoints") {
+        realAction = "buffer";
+        realEvent = event;
+    }
+    if (actiontype === "chat") {
+        realAction = "chat";
+        realEvent = event;
+    }
+    if (actiontype === "note") {
+        realAction = "note";
+        realEvent = event;
+    }
+    if (actiontype === "drawText") {
+        realAction = "text";
+        realEvent = event;
+    }
+    if (actiontype === "drawDecal") {
+        realAction = "decal";
+        realEvent = event;
+    }
 
-	var data = JSON.stringify({
-		action: realAction,
-		image: realImage,
-		event: realEvent,
-		_id: currentSessionID,
-		mail: loginParametersMail,
-		company: loginParametersCompany,
-		dateend: Date.now(),
-	});
-    
+    var data = JSON.stringify({
+        action: realAction,
+        image: realImage,
+        event: realEvent,
+        _id: currentSessionID,
+        mail: loginParametersMail,
+        company: loginParametersCompany,
+        dateend: Date.now(),
+    });
+
 
     let initObject = {
-        method:'POST', headers:rheaders,body:data
+        method: 'POST', headers: rheaders, body: data
     };
 
-    
-    
+
+
     fetch(url, initObject)
-    .then((response) => response.json())    
-    .then((data) => {
-        console.log("success", data);       
-    })
-    .catch(function (err) {
-        console.log("[UpdateSessionV2] Something went wrong!", err);
-    });
-    
-    
-    
-    
+        .then((response) => response.json())
+        .then((data) => {
+            console.log("success", data);
+        })
+        .catch(function (err) {
+            console.log("[UpdateSessionV2] Something went wrong!", err);
+        });
+
+
+
+
 
 }
 
@@ -1388,73 +1569,73 @@ function stopSessionTimer() {
 
 function filesHandlerCloud(files, user) {
 
-	var data = new FormData();
-	var requestString = APIPath + "/posts/upload?company=" + loginParametersCompany;
+    var data = new FormData();
+    var requestString = APIPath + "/posts/upload?company=" + loginParametersCompany;
 
-	if (user == true) {
-		// file selected by the user
-		// check extension
-		//if (!myutils.isValidFile(files[0].name)) {
-		//	alert('this kind of file is not permitted')
-		//	return;
-		//}
-		// check size
-		//var FileSize = files[0].size / 1024 / 1024; // in MB
-		//if (FileSize > 10) {
-		//	alert('File size exceeds 10 MB');
-		//	return;
-		//}
-		// in case of multiple files append each of them
-		//data.append("file", files[0]);
-		// we have to change also the request in order to pass right arguments to server
-		//requestString = requestString + "&session=no";
-	}
-	else {
-		//let status = easyrtc.getConnectStatus(otherEasyrtcid);
-		//if (status === easyrtc.NOT_CONNECTED)
-		//	return;
-		imageSessionCounter = imageSessionCounter + 1;
-		var imageFileName = currentSessionID + "." + imageSessionCounter + ".jpg";
-		// file automatically pushed to server
-		data.append("file", files, imageFileName);
-		// we have to change also the request in order to pass right arguments to server
-		requestString = requestString + "&session=yes&filename=" + imageFileName;
+    if (user == true) {
+        // file selected by the user
+        // check extension
+        //if (!myutils.isValidFile(files[0].name)) {
+        //	alert('this kind of file is not permitted')
+        //	return;
+        //}
+        // check size
+        //var FileSize = files[0].size / 1024 / 1024; // in MB
+        //if (FileSize > 10) {
+        //	alert('File size exceeds 10 MB');
+        //	return;
+        //}
+        // in case of multiple files append each of them
+        //data.append("file", files[0]);
+        // we have to change also the request in order to pass right arguments to server
+        //requestString = requestString + "&session=no";
+    }
+    else {
+        //let status = easyrtc.getConnectStatus(otherEasyrtcid);
+        //if (status === easyrtc.NOT_CONNECTED)
+        //	return;
+        imageSessionCounter = imageSessionCounter + 1;
+        var imageFileName = currentSessionID + "." + imageSessionCounter + ".jpg";
+        // file automatically pushed to server
+        data.append("file", files, imageFileName);
+        // we have to change also the request in order to pass right arguments to server
+        requestString = requestString + "&session=yes&filename=" + imageFileName;
 
-		// write also in the session in order to save the log
-		updateSession("image", imageFileName);
-		//lastImageSavedAddress = imageFileName;
-		//$$("magnifyimageiconmain").show();
-	}
+        // write also in the session in order to save the log
+        updateSession("image", imageFileName);
+        //lastImageSavedAddress = imageFileName;
+        //$$("magnifyimageiconmain").show();
+    }
 
-	var request = new XMLHttpRequest();
-	request.open("post", requestString);
+    var request = new XMLHttpRequest();
+    request.open("post", requestString);
 
-	// upload progress event
-	//request.upload.addEventListener("progress", function (e) {
-	//	var percent_complete = (e.loaded / e.total) * 100;
+    // upload progress event
+    //request.upload.addEventListener("progress", function (e) {
+    //	var percent_complete = (e.loaded / e.total) * 100;
 
-		// Percentage of upload completed
-		//console.log(percent_complete);
-		//if (user == true)
-			//fileStatus.innerHTML = "progress: " + Math.round(percent_complete);
-	//});
+    // Percentage of upload completed
+    //console.log(percent_complete);
+    //if (user == true)
+    //fileStatus.innerHTML = "progress: " + Math.round(percent_complete);
+    //});
 
-	// AJAX request finished event
-	request.addEventListener("load", function (e) {
-		// HTTP status message
-		console.log(request.status);
-		//if (user == true) {
-			// notify the good response to HTML
-			//fileStatus.innerHTML = request.response;
-			// refresh filelist
-			//filesListHandler();
-		//}
-		// request.response will hold the response from the server
-		console.log(request.response);
-	});
+    // AJAX request finished event
+    request.addEventListener("load", function (e) {
+        // HTTP status message
+        console.log(request.status);
+        //if (user == true) {
+        // notify the good response to HTML
+        //fileStatus.innerHTML = request.response;
+        // refresh filelist
+        //filesListHandler();
+        //}
+        // request.response will hold the response from the server
+        console.log(request.response);
+    });
 
-	// send POST request to server side script
-	request.send(data);
+    // send POST request to server side script
+    request.send(data);
 }
 
 
@@ -1979,13 +2160,12 @@ function showButtons() {
 
 function checkButtonsBar() {
     if (!isButtonsBarOver) {
-        
-        if(!getIsPro())
-        {
+
+        if (!getIsPro()) {
             toggleClassElements('videoMenuBar', 'none');
             control.style.display = 'none';
         }
-            
+
         isButtonsVisible = false;
     }
     setTimeout(() => {
@@ -2061,7 +2241,7 @@ function getCookie(cName) {
 function isHtml(str) {
     var a = document.createElement('div');
     a.innerHTML = str;
-    for (var c = a.childNodes, i = c.length; i--; ) {
+    for (var c = a.childNodes, i = c.length; i--;) {
         if (c[i].nodeType == 1) return true;
     }
     return false;
@@ -2083,20 +2263,18 @@ function toggleWhiteboard() {
 function wbCanvasToJson() {
     if (/*this.wbRC*/rc.thereIsParticipants()) {
         let restrictCanvas = true // this parameter tell to send one stroke at a time
-        if(restrictCanvas == false)
-        {
+        if (restrictCanvas == false) {
             let wbCanvasJson = JSON.stringify(realWhiteBoard.wbCanvas.toJSON());
             /*this.wbRC*/rc.socket.emit('wbCanvasToJson', wbCanvasJson);
         }
-        else if(realWhiteBoard.lastObj)
-        {
+        else if (realWhiteBoard.lastObj) {
             //console.log(realWhiteBoard.lastObj);
             //console.log(realWhiteBoard.lastObj.toJSON());
             //console.log(JSON.stringify(realWhiteBoard.lastObj.toJSON()));
 
             // this is the last chance to add the element id for the objects
             let myid = realWhiteBoard.lastObj.type + Math.round(Math.random() * 10000);
-            realWhiteBoard.lastObj.set({'elementID': myid});    
+            realWhiteBoard.lastObj.set({ 'elementID': myid });
 
             let wbCanvasJson = JSON.stringify(realWhiteBoard.lastObj.toJSON(['elementID']));
             /*this.wbRC*/rc.socket.emit('wbSingleToJson', wbCanvasJson);
@@ -2113,7 +2291,7 @@ function wbTransmitPointer(data) {
     }
 }
 
-function wbTransmitModify(data){
+function wbTransmitModify(data) {
     console.log("transmit modify");
     //console.log( JSON.stringify(realWhiteBoard.wbCanvas.toJSON()))
     if (rc.thereIsParticipants()) {
@@ -2123,7 +2301,7 @@ function wbTransmitModify(data){
     }
 }
 
-function wbTransmitDelete(data){
+function wbTransmitDelete(data) {
     console.log("transmit delete");
     //console.log( JSON.stringify(realWhiteBoard.wbCanvas.toJSON()))
     if (rc.thereIsParticipants()) {
@@ -2223,7 +2401,7 @@ async function whiteboardAddObj(type) {
                 if (result.isConfirmed) {
                     let wbCanvasImgURL = result.value;
                     if (isImageURL(wbCanvasImgURL)) {
-                       realWhiteBoard.createImageFromURL(wbCanvasImgURL);
+                        realWhiteBoard.createImageFromURL(wbCanvasImgURL);
                     } else {
                         userLog('error', 'The URL is not a valid image', 'top-end');
                     }
@@ -2252,7 +2430,7 @@ async function whiteboardAddObj(type) {
                 },
             }).then((result) => {
                 if (result.isConfirmed) {
-                    realWhiteBoard.whiteboardSetDrawingMode("none"); 
+                    realWhiteBoard.whiteboardSetDrawingMode("none");
                     let wbCanvasImg = result.value;
                     if (wbCanvasImg && wbCanvasImg.size > 0) {
                         let reader = new FileReader();
@@ -2270,7 +2448,7 @@ async function whiteboardAddObj(type) {
                 }
             });
             break;
-        case 'text':            
+        case 'text':
             Swal.fire({
                 background: swalBackground,
                 title: 'Enter the text',
@@ -2294,7 +2472,7 @@ async function whiteboardAddObj(type) {
             //addWbCanvasObj(text);
             break;
         case 'line':
-            realWhiteBoard.whiteboardSetDrawingMode("line");            
+            realWhiteBoard.whiteboardSetDrawingMode("line");
             break;
         case 'circle':
             realWhiteBoard.whiteboardSetDrawingMode("circle");
@@ -2313,7 +2491,7 @@ async function whiteboardAddObj(type) {
                 position: 'center',
                 title: 'Select the decal',
                 input: 'select',
-                inputOptions: {                   
+                inputOptions: {
                     'warning': 'Warning',
                     'atom': 'Atom',
                     'crush': 'Crush',
@@ -2327,17 +2505,17 @@ async function whiteboardAddObj(type) {
                     'readmanual': 'Manual',
                     'toxic': 'Toxic',
                     'voltage': 'Voltage',
-                  },
-                  inputPlaceholder: 'Select a decal',
-                  inputValidator: (value) => {
+                },
+                inputPlaceholder: 'Select a decal',
+                inputValidator: (value) => {
                     return new Promise((resolve) => {
-                      if (value != 'oranges') {
-                        resolve()
-                      } else {
-                        resolve('You need to select a decal! :)')
-                      }
+                        if (value != 'oranges') {
+                            resolve()
+                        } else {
+                            resolve('You need to select a decal! :)')
+                        }
                     })
-                  },
+                },
                 showClass: {
                     popup: 'animate__animated animate__fadeInDown',
                 },
@@ -2346,7 +2524,7 @@ async function whiteboardAddObj(type) {
                 },
             })
 
-            if(decal){
+            if (decal) {
                 console.log(decal);
                 realWhiteBoard.createDecal("/images/decals/" + decal + ".png");
             }
@@ -2390,12 +2568,12 @@ async function whiteboardAddObj(type) {
 
                     // sync input[type=number] with input[type=range]
                     inputRange.addEventListener('input', () => {
-                    inputNumber.value = inputRange.value
+                        inputNumber.value = inputRange.value
                     })
 
                     // sync input[type=range] with input[type=number]
                     inputNumber.addEventListener('change', () => {
-                    inputRange.value = inputNumber.value
+                        inputRange.value = inputNumber.value
                     })
                 }
             }).then((result) => {
@@ -2405,16 +2583,16 @@ async function whiteboardAddObj(type) {
 
                     let wbalpha = result.value;
                     if (wbalpha) {
-                        
+
                         realWhiteBoard.wbOpacity = wbalpha;
-                        
+
                         // we must convert the wbfillcolor to an alpha value
                         var decimal = parseInt(wbalpha);
                         // convert to hex
                         var myhex = decimal.toString(16).toUpperCase();
-                        
+
                         // take in account the fact that we need always a two digit string
-                        if(decimal < 16)
+                        if (decimal < 16)
                             myhex = '0' + myhex;
 
                         realWhiteBoard.wbOpacityHex = myhex;
@@ -2422,19 +2600,17 @@ async function whiteboardAddObj(type) {
                         // we can have two different format:
                         // 1) #ffffffff
                         // 2) #ffffff
-                        if(realWhiteBoard.wbFillColor.length == 7)
-                        {
+                        if (realWhiteBoard.wbFillColor.length == 7) {
                             realWhiteBoard.wbFillColor = realWhiteBoard.wbFillColor + myhex;
                         }
-                        else
-                        {
+                        else {
                             realWhiteBoard.wbFillColor = realWhiteBoard.wbFillColor.slice(0, realWhiteBoard.wbFillColor.length - 2) + myhex;
                         }
                     }
                 }
             });
 
-      
+
 
             /*    Swal.fire({
                     background: swalBackground,
@@ -2530,9 +2706,9 @@ function wbCanvasSaveImg() {
     saveImageLog();
 }
 
-function OpenWhiteBoardAfterSnapShot(){
+function OpenWhiteBoardAfterSnapShot() {
     if (!wbIsOpen) toggleWhiteboard();
-} 
+}
 
 function SingleJsonToWbCanvas(json) {
     if (!wbIsOpen) toggleWhiteboard();
@@ -2545,7 +2721,7 @@ function SingleJsonToWbCanvas(json) {
 function ModifyCommand(jsontext) {
 
     //console.log("we are moving object!");
-    
+
 
     // convert the text to a json object for easy of use
     var jsonCommand = JSON.parse(jsontext);
@@ -2553,25 +2729,23 @@ function ModifyCommand(jsontext) {
     //console.log(jsonCommand);
 
     // cycle all objects
-    for(var k in realWhiteBoard.wbCanvas.getObjects()) {
+    for (var k in realWhiteBoard.wbCanvas.getObjects()) {
         //console.log(realWhiteBoard.wbCanvas._objects[k]);
 
 
-        if( realWhiteBoard.wbCanvas._objects[k].type == "image" ||
+        if (realWhiteBoard.wbCanvas._objects[k].type == "image" ||
             realWhiteBoard.wbCanvas._objects[k].type == "rect" ||
             realWhiteBoard.wbCanvas._objects[k].type == "line" ||
             realWhiteBoard.wbCanvas._objects[k].type == "ellipse" ||
             realWhiteBoard.wbCanvas._objects[k].type == "text" ||
-            realWhiteBoard.wbCanvas._objects[k].type == "path" 
-            )
-        {
-            
+            realWhiteBoard.wbCanvas._objects[k].type == "path"
+        ) {
+
             // check if it is the right object
-            if(jsonCommand.elementID == realWhiteBoard.wbCanvas._objects[k].elementID)
-            {
+            if (jsonCommand.elementID == realWhiteBoard.wbCanvas._objects[k].elementID) {
                 //console.log("is it!");
-                realWhiteBoard.wbCanvas._objects[k].set({ 
-                    left: jsonCommand.target.left, 
+                realWhiteBoard.wbCanvas._objects[k].set({
+                    left: jsonCommand.target.left,
                     top: jsonCommand.target.top,
                     scaleX: jsonCommand.target.scaleX,
                     scaleY: jsonCommand.target.scaleY,
@@ -2581,24 +2755,23 @@ function ModifyCommand(jsontext) {
             }
         }
 
-        
-    }   
+
+    }
 }
 
 // delete the object, the command comes from remote partecipants
-function DeleteCommand(elementID){
+function DeleteCommand(elementID) {
     //console.log(elementID);
     // cycle all objects
-    for(var k in realWhiteBoard.wbCanvas.getObjects()) {
+    for (var k in realWhiteBoard.wbCanvas.getObjects()) {
         //console.log(realWhiteBoard.wbCanvas._objects[k]);
-            // check if it is the right object
-            if( (typeof realWhiteBoard.wbCanvas._objects[k] !== "undefined") && (elementID == realWhiteBoard.wbCanvas._objects[k].elementID))
-            {
-                //console.log("is it!");
-                realWhiteBoard.wbCanvas.remove(realWhiteBoard.wbCanvas._objects[k]);
-                realWhiteBoard.wbCanvas.renderAll();
-            }
-    }   
+        // check if it is the right object
+        if ((typeof realWhiteBoard.wbCanvas._objects[k] !== "undefined") && (elementID == realWhiteBoard.wbCanvas._objects[k].elementID)) {
+            //console.log("is it!");
+            realWhiteBoard.wbCanvas.remove(realWhiteBoard.wbCanvas._objects[k]);
+            realWhiteBoard.wbCanvas.renderAll();
+        }
+    }
 }
 
 
@@ -2610,7 +2783,7 @@ function JsonToWbCanvas(json) {
     realWhiteBoard.revivePointer();
 }
 
-function ImportPictureFromVuzix(data){
+function ImportPictureFromVuzix(data) {
     realWhiteBoard.createImageFromURL(data, false);
 }
 
@@ -2651,7 +2824,7 @@ function whiteboardAction(data, emit = true) {
             rc.socket.emit('whiteboardAction', data);
         }
     } else {
-        if(data.action != "pointer" && data.action != "screenshot" && data.action != "bigpicture")
+        if (data.action != "pointer" && data.action != "screenshot" && data.action != "bigpicture")
             userLog(
                 'info',
                 `${data.peer_name} <i class="fas fa-chalkboard-teacher"></i> whiteboard action: ${data.action}`,
@@ -2683,20 +2856,20 @@ function whiteboardAction(data, emit = true) {
             if (wbIsOpen) toggleWhiteboard();
             break;
         case 'pointer':
-            realWhiteBoard.movePointer(data.x,data.y);
+            realWhiteBoard.movePointer(data.x, data.y);
             break;
-        case 'screenshot':            
+        case 'screenshot':
             realWhiteBoard.wbCanvas.clear();
             realWhiteBoard.whiteboardSetDrawingMode("draw");
-            realWhiteBoard.createImageFromURL(data.image, true);            
+            realWhiteBoard.createImageFromURL(data.image, true);
             //saveImageLog(); // save log moment on cloud
             break;
-        case 'bigpicture':            
+        case 'bigpicture':
             realWhiteBoard.wbCanvas.clear();
-            realWhiteBoard.whiteboardSetDrawingMode("draw");   
+            realWhiteBoard.whiteboardSetDrawingMode("draw");
             realWhiteBoard.saveBigPicture("data:image/jpg;base64," + data.image);
             break;
-    
+
         //...
     }
 }
@@ -2717,7 +2890,7 @@ function toggleParticipants() {
     isParticipantsListOpen = !isParticipantsListOpen;
 }
 
-async function getFirstPartecipantName(){
+async function getFirstPartecipantName() {
     var partName = "---";
     let room_info = await rc.getRoomInfo();
     let peers = new Map(JSON.parse(room_info.peers));
@@ -2827,8 +3000,7 @@ async function getParticipantsTable(peers) {
         } else {
             if (isRulesActive && isPresenter) {
                 //console.log("ciccio03");
-                if(peer_os == "Blade2")                    
-                {
+                if (peer_os == "Blade2") {
                     table += `
                     <tr id='${peer_id}'>
                         <td><img src='${avatarImg}'></td>
@@ -2841,8 +3013,7 @@ async function getParticipantsTable(peers) {
                     </tr>
                     `;
                 }
-                else
-                {
+                else {
                     table += `
                     <tr id='${peer_id}'>
                         <td><img src='${avatarImg}'></td>
@@ -2860,8 +3031,7 @@ async function getParticipantsTable(peers) {
             } else {
                 //console.log("ciccio04");
                 //console.log(peer_info);
-                if(peer_os == "Blade2")                    
-                {
+                if (peer_os == "Blade2") {
                     //console.log("ciccio05");
                     //console.log("ecco il caso giusto");
                     table += `
@@ -2875,8 +3045,7 @@ async function getParticipantsTable(peers) {
                     `;
 
                 }
-                else
-                {
+                else {
                     //console.log("ciccio06");
                     table += `
                     <tr id='${peer_id}'>
@@ -2891,7 +3060,7 @@ async function getParticipantsTable(peers) {
                         <td></td>
                     </tr>
                     `;
-    
+
                 }
             }
         }

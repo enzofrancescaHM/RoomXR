@@ -232,6 +232,10 @@ class RoomClient {
             });
         };
 
+
+        // temp hack
+        //document.domain = "roomxr.eu:5002";
+
         // ####################################################
         // CREATE ROOM AND JOIN
         // ####################################################
@@ -1318,6 +1322,7 @@ class RoomClient {
                 d = document.createElement('div');
                 d.className = 'Camera';
                 d.id = id + '__video';
+                
                 elem = document.createElement('video');
                 elem.setAttribute('id', id);
                 !isScreen && elem.setAttribute('name', this.peer_id);
@@ -1372,7 +1377,7 @@ class RoomClient {
                 d.appendChild(pm);
                 d.appendChild(i);
                 d.appendChild(p);
-                d.appendChild(vb);
+                d.appendChild(vb);                
                 this.videoMediaContainer.appendChild(d);
                 this.attachMediaStream(elem, stream, type, 'Producer');
                 this.myVideoEl = elem;
@@ -1600,7 +1605,7 @@ class RoomClient {
     }
 
     handleConsumer(id, type, stream, peer_name, peer_info) {
-        let elem, vb, d, p, i, cm, au, fs, ts, sf, sm, sv, ko, pb, pm, pv, pn, bp;
+        let elem, vb, d, p, i, cm, au, fs, ts, sf, sm, sv, ko, pb, pm, pv, pn, bp, cv, cv2;
 
         console.log('PEER-INFO', peer_info);
         console.log( DetectRTC.browser.name);
@@ -1629,7 +1634,7 @@ class RoomClient {
                 elem.className = '';
                 elem.className = (isGlasses &&  DetectRTC.browser.name == "Firefox")  ? 'upsidedown' : '';
                 elem.poster = image.poster;
-                elem.style.objectFit = remoteIsScreen ? 'contain' : 'var(--videoObjFit)';
+                elem.style.objectFit = remoteIsScreen ? 'contain' : 'var(--videoObjFit)';               
                 vb = document.createElement('div');
                 vb.setAttribute('id', remotePeerId + '__vb');
                 vb.className = 'videoMenuBar fadein';
@@ -1702,6 +1707,29 @@ class RoomClient {
                 d.appendChild(p);
                 d.appendChild(pm);
                 d.appendChild(vb);
+
+
+
+                cv = document.createElement('canvas');
+                cv.setAttribute('id', id + '__canvas');
+                //cv.style.objectFit = 'var(--videoObjFit)';
+                cv.style.width = /*elem.offsetWidth +'px'*/"100%";
+                cv.style.height = /*elem.offsetWidth + 'px'*/"100%";
+                cv.style.position = 'absolute';
+                cv.style.zIndex = '1000';
+                d.appendChild(cv);
+
+                
+                // cv2 = document.createElement('canvas');
+                // cv2.setAttribute('id', id + '__canvas2');
+                // //cv.style.objectFit = 'var(--videoObjFit)';
+                // cv2.style.width = /*elem.offsetWidth +'px'*/"100%";
+                // cv2.style.height = /*elem.offsetWidth + 'px'*/"100%";
+                // cv2.style.position = 'absolute';
+                // cv2.style.zIndex = '0';
+                // d.appendChild(cv2);
+
+
                 this.videoMediaContainer.appendChild(d);
                 this.attachMediaStream(elem, stream, type, 'Consumer');
                 this.isVideoFullScreenSupported && this.handleFS(elem.id, fs.id);
