@@ -1637,6 +1637,7 @@ class RoomClient {
                 elem.style.objectFit = remoteIsScreen ? 'contain' : 'var(--videoObjFit)';               
                 vb = document.createElement('div');
                 vb.setAttribute('id', remotePeerId + '__vb');
+                vb.style.zIndex = '1001';
                 vb.className = 'videoMenuBar fadein';
                 pv = document.createElement('input');
                 pv.id = remotePeerId + '___pVolume';
