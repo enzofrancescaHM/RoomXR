@@ -1048,6 +1048,15 @@ class RoomClient {
         };
         let videoConstraints = {
             audio: false,
+            video:{
+                width:{ ideal: 1280},
+                height:{ ideal: 720},
+                deviceId: {exact: deviceId},
+                aspectRatio: 1.777,
+                //frameRate: 30,
+                
+            }
+            /*
             video: {
                 width: {
                     min: 640,
@@ -1062,7 +1071,7 @@ class RoomClient {
                 deviceId: deviceId,
                 aspectRatio: 1.777, // 16:9
                 frameRate: frameRate,
-            },
+            },*/
         }; // Init auto detect max cam resolution and fps
 
         switch (videoQuality.value) {
@@ -1073,8 +1082,8 @@ class RoomClient {
                     video: {
                         width: { ideal: 1280 },
                         height: { ideal: 720 },
-                        deviceId: deviceId,
-                        aspectRatio: 1.777,
+                        deviceId: { exact: deviceId },
+                        //aspectRatio: 1.777,
                         frameRate: frameRate,
                     },
                 };
@@ -1085,7 +1094,7 @@ class RoomClient {
                     video: {
                         width: { exact: 320 },
                         height: { exact: 240 },
-                        deviceId: deviceId,
+                        deviceId: { exact: deviceId },
                         aspectRatio: 1.777,
                         frameRate: frameRate,
                     },
@@ -1097,7 +1106,7 @@ class RoomClient {
                     video: {
                         width: { exact: 640 },
                         height: { exact: 480 },
-                        deviceId: deviceId,
+                       deviceId: { exact: deviceId },
                         aspectRatio: 1.777,
                         frameRate: frameRate,
                     },
@@ -1109,7 +1118,7 @@ class RoomClient {
                     video: {
                         width: { exact: 1280 },
                         height: { exact: 720 },
-                        deviceId: deviceId,
+                        deviceId: { exact: deviceId },
                         aspectRatio: 1.777,
                         frameRate: frameRate,
                     },
@@ -1121,7 +1130,7 @@ class RoomClient {
                     video: {
                         width: { exact: 1920 },
                         height: { exact: 1080 },
-                        deviceId: deviceId,
+                        deviceId: { exact: deviceId },
                         aspectRatio: 1.777,
                         frameRate: frameRate,
                     },
@@ -1133,7 +1142,7 @@ class RoomClient {
                     video: {
                         width: { exact: 2560 },
                         height: { exact: 1440 },
-                        deviceId: deviceId,
+                        deviceId: { exact: deviceId },
                         aspectRatio: 1.777,
                         frameRate: frameRate,
                     },
@@ -1145,7 +1154,7 @@ class RoomClient {
                     video: {
                         width: { exact: 3840 },
                         height: { exact: 2160 },
-                        deviceId: deviceId,
+                        deviceId: { exact: deviceId },
                         aspectRatio: 1.777,
                         frameRate: frameRate,
                     },

@@ -1726,8 +1726,17 @@ async function changeCamera(deviceId) {
         stopTracks(initStream);
         show(initVideo);
     }
+    const videoConstraints = {
+        audio: false,
+        video: {
+            width: { ideal: 1280 },
+            height: { ideal: 720 },
+            deviceId: { exact: deviceId },
+            aspectRatio: 1.777,
+        },
+    };
     navigator.mediaDevices
-        .getUserMedia({ video: { deviceId: deviceId } })
+        .getUserMedia(/*{ video: { deviceId: deviceId } }*/ videoConstraints)
         .then((camStream) => {
             //initVideo.className = 'mirror';
             initVideo.srcObject = camStream;
