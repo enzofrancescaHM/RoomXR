@@ -1024,7 +1024,7 @@ class RoomClient {
                 echoCancellation: true,
                 noiseSuppression: true,
                 sampleRate: 44100,
-                deviceId: deviceId,
+                deviceId: {exact: deviceId},
             },
             video: false,
         };
